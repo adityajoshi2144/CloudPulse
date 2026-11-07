@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudpulse-frontend
+  namespace: cloudpulse
+  labels:
+    app: cloudpulse-frontend
+    tier: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudpulse-frontend
+  template:
+    metadata:
+      labels:
+        app: cloudpulse-frontend
+        tier: web
+    spec:
+      containers:
+        - name: frontend
+          image: cloudpulse-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudpulse-frontend-service
+  namespace: cloudpulse
+  labels:
+    app: cloudpulse-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudpulse-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

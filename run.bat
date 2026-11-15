@@ -1,9 +1,9 @@
 @echo off
-TITLE CloudPulse - Cloud Operations and Intelligent Auto-Scaling Platform
+TITLE CloudPulse - Website Traffic Protection & Cloud Operations Platform
 echo ==============================================================
-echo ⚡ CLOUDPULSE — AUTONOMOUS AUTO-SCALING AND TELEMETRY PLATFORM
+echo ⚡ CLOUDPULSE — WEBSITE PROTECTION & AUTONOMOUS RECOVERY
 echo ==============================================================
+echo [*] Launching CloudPulse platform...
 cd /d "%~dp0"
 python run.py
 pause
-

@@ -85,7 +85,7 @@ def main():
     threading.Thread(target=open_browser_later, daemon=True).start()
 
     try:
-        subprocess.run(cmd, cwd=str(FRONTEND_DIR))
+        subprocess.run(cmd, cwd=str(FRONTEND_DIR), shell=(sys.platform == "win32"))
     except KeyboardInterrupt:
         print("\n[*] Shutting down CloudPulse. Goodbye!")
 

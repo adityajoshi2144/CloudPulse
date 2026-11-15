@@ -4,13 +4,12 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.cache import cache_service
+from app.core.metrics_collector import metrics_collector
 from app.core.telemetry_state import telemetry_state
-from app.services.autoscaler import autoscaler_service
 from app.services.simulator_engine import simulator_engine
 
 from app.routers import (
@@ -24,7 +23,9 @@ from app.routers import (
     cache,
     experiments,
     audit,
-    slo
+    slo,
+    risk,
+    reports
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -37,14 +38,9 @@ async def telemetry_background_loop():
     """Evolves cluster metrics every 1s and broadcasts to WebSocket clients."""
     while True:
         try:
-            # 1. Update telemetry physics & simulation
+            # Collect only host and request measurements; scenario simulation is separate.
             telemetry_state.update_tick()
-            simulator_engine.tick()
 
-            # 2. Evaluate Kubernetes / CloudPulse HPA policies
-            autoscaler_service.evaluate_hpa()
-
-            # 3. Broadcast to WebSockets if any clients connected
             if active_websockets:
                 payload = json.dumps({
                     "type": "TELEMETRY_UPDATE",
@@ -91,11 +87,33 @@ app = FastAPI(
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def collect_http_metrics(request, call_next):
+    started = asyncio.get_running_loop().time()
+    try:
+        response = await call_next(request)
+    except Exception:
+        path = request.url.path
+        if not path.startswith(("/api/metrics", "/metrics", "/api/health", "/health")):
+            metrics_collector.record_request(
+                asyncio.get_running_loop().time() - started,
+                500,
+            )
+        raise
+
+    path = request.url.path
+    if not path.startswith(("/api/metrics", "/metrics", "/api/health", "/health")):
+        metrics_collector.record_request(
+            asyncio.get_running_loop().time() - started,
+            response.status_code,
+        )
+    return response
 
 # Mount REST API Routers
 app.include_router(health.router, prefix=settings.API_V1_STR)
@@ -109,9 +127,12 @@ app.include_router(cache.router, prefix=settings.API_V1_STR)
 app.include_router(experiments.router, prefix=settings.API_V1_STR)
 app.include_router(audit.router, prefix=settings.API_V1_STR)
 app.include_router(slo.router, prefix=settings.API_V1_STR)
+app.include_router(risk.router, prefix=settings.API_V1_STR)
+app.include_router(reports.router, prefix=settings.API_V1_STR)
 
 # Also expose standard /metrics endpoint for Prometheus scrapers
 app.include_router(metrics.router, prefix="")
+simulator_engine.configure_local_app(app)
 
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry_endpoint(websocket: WebSocket):

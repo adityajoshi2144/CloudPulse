@@ -1,8 +1,10 @@
 import React, { useState, Suspense, lazy } from 'react';
+import { Activity } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { CommandPalette } from './components/CommandPalette';
+import { FacultyDemoModal } from './components/FacultyDemoModal';
 
 import { OverviewPage } from './pages/OverviewPage';
 import { LiveMonitoringPage } from './pages/LiveMonitoringPage';
@@ -25,6 +27,15 @@ const TrafficSimulatorPage = lazy(() =>
 const ExperimentsPage = lazy(() =>
   import('./pages/ExperimentsPage').then((m) => ({ default: m.ExperimentsPage }))
 );
+const RiskAnalysisPage = lazy(() =>
+  import('./pages/RiskAnalysisPage').then((m) => ({ default: m.RiskAnalysisPage }))
+);
+const SystemHealthPage = lazy(() =>
+  import('./pages/SystemHealthPage').then((m) => ({ default: m.SystemHealthPage }))
+);
+const ReportsPage = lazy(() =>
+  import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage }))
+);
 
 const PageSkeleton: React.FC = () => (
   <div className="space-y-4 animate-pulse">
@@ -36,14 +47,33 @@ const PageSkeleton: React.FC = () => (
       <div className="h-28 bg-surface-200/40 rounded-xl border border-border" />
     </div>
     <div className="h-96 bg-surface-200/30 rounded-xl border border-border flex items-center justify-center text-xs font-mono text-slate-500">
-      Initializing WebGL shaders & telemetry pipeline...
+      Loading dashboard and telemetry...
     </div>
   </div>
 );
 
 const AppContent: React.FC = () => {
-  const { activeTab, toasts } = useApp();
+  const { activeTab, toasts, isInitialLoading } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  if (isInitialLoading) {
+    return (
+      <div role="status" className="flex min-h-screen items-center justify-center bg-[#080b12] text-slate-100">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10">
+            <Activity className="h-6 w-6 animate-pulse text-cyan-300" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold tracking-wide">CloudPulse</p>
+            <p className="mt-1 text-xs text-slate-400">Connecting to live telemetry…</p>
+          </div>
+          <div className="h-1 w-36 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full w-1/2 animate-pulse rounded-full bg-cyan-400" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const renderActivePage = () => {
     switch (activeTab) {
@@ -65,6 +95,24 @@ const AppContent: React.FC = () => {
         return (
           <Suspense fallback={<PageSkeleton />}>
             <TrafficSimulatorPage />
+          </Suspense>
+        );
+      case 'risk':
+        return (
+          <Suspense fallback={<PageSkeleton />}>
+            <RiskAnalysisPage />
+          </Suspense>
+        );
+      case 'health':
+        return (
+          <Suspense fallback={<PageSkeleton />}>
+            <SystemHealthPage />
+          </Suspense>
+        );
+      case 'reports':
+        return (
+          <Suspense fallback={<PageSkeleton />}>
+            <ReportsPage />
           </Suspense>
         );
       case 'incidents':
@@ -108,9 +156,9 @@ const AppContent: React.FC = () => {
           <div className="flex items-center gap-3">
             <span>CloudPulse Platform v2.4</span>
             <span>•</span>
-            <span className="text-emerald-400">Cluster Quorum: 99.98%</span>
+            <span className="text-slate-400">Local host telemetry</span>
             <span>•</span>
-            <span>HPA v2</span>
+            <span>Kubernetes not connected</span>
           </div>
           <div>
             Built with React 19, TypeScript, Tailwind, Three.js & Python FastAPI
@@ -120,6 +168,9 @@ const AppContent: React.FC = () => {
 
       {/* Global Command Palette (Cmd + K) */}
       <CommandPalette />
+
+      {/* Interactive Faculty Demonstration Wizard */}
+      <FacultyDemoModal />
 
       {/* Global Toast Notification Container */}
       <div className="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">

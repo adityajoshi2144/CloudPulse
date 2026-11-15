@@ -10,7 +10,12 @@ import {
   Experiment,
   AuditLogItem,
   SLOItem,
-  TelemetryPoint
+  TelemetryPoint,
+  SimulatorConfig,
+  SimulatorLimits,
+  RiskAnalysis,
+  RiskConfiguration,
+  SimulationReport
 } from './types';
 
 const API_BASE = '/api';
@@ -48,8 +53,7 @@ export const api = {
   // Services
   getServices: () => request<ServiceItem[]>('/services'),
   getServiceDetail: (id: string) => request<ServiceItem>(`/services/${id}`),
-  restartService: (id: string) => request<{ status: string; message: string; restarted_pods: number }>(`/services/${id}/restart`, { method: 'POST' }),
-  getServiceLogs: (id: string) => request<{ service_id: string; logs: any[] }>(`/services/${id}/logs`),
+  getServiceLogs: (id: string) => request<{ service_id: string; available: boolean; message: string; logs: any[] }>(`/services/${id}/logs`),
 
   // Scaling
   getScalingPolicies: () => request<ScalingPolicy[]>('/scaling/policies'),
@@ -59,12 +63,11 @@ export const api = {
       body: JSON.stringify(policy),
     }),
   getScalingEvents: () => request<ScalingEvent[]>('/scaling/events'),
-  triggerManualScale: (serviceId: string, replicas: number) =>
-    request<any>(`/scaling/manual?service_id=${serviceId}&replicas=${replicas}`, { method: 'POST' }),
 
   // Simulator
   getSimulatorStatus: () => request<SimulatorStatus>('/simulator/status'),
-  startSimulator: (config: any) =>
+  getSimulatorLimits: () => request<SimulatorLimits>('/simulator/limits'),
+  startSimulator: (config: SimulatorConfig) =>
     request<SimulatorStatus>('/simulator/start', {
       method: 'POST',
       body: JSON.stringify(config),
@@ -73,12 +76,19 @@ export const api = {
   resumeSimulator: () => request<SimulatorStatus>('/simulator/resume', { method: 'POST' }),
   stopSimulator: () => request<SimulatorStatus>('/simulator/stop', { method: 'POST' }),
 
-  // Incidents
+  // Evidence-based risk analysis
+  getRiskAnalysis: () => request<RiskAnalysis>('/risk'),
+  updateRiskConfiguration: (config: RiskConfiguration) =>
+    request<RiskConfiguration>('/risk/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
+
+  // Simulation reports
+  getReports: () => request<{ persistence: string; reports: SimulationReport[] }>('/reports'),
+
+  // Incident history requires an external incident source.
   getIncidents: () => request<Incident[]>('/incidents'),
-  triggerPodFailure: (serviceId: string = 'order-service') =>
-    request<{ status: string; incident: Incident }>(`/incidents/trigger-failure?service_id=${serviceId}`, { method: 'POST' }),
-  recoverIncident: (incidentId?: string) =>
-    request<any>(`/incidents/recover${incidentId ? `?incident_id=${incidentId}` : ''}`, { method: 'POST' }),
   getIncidentRCA: (incidentId: string) => request<any>(`/incidents/${incidentId}/rca`),
 
   // Alerts
@@ -99,7 +109,14 @@ export const api = {
 
   // Experiments
   getExperiments: () => request<Experiment[]>('/experiments'),
-  runExperiment: (req: { name: string; test_duration_seconds: number; virtual_users: number }) =>
+  runExperiment: (req: {
+    name: string;
+    test_duration_seconds: number;
+    virtual_users: number;
+    pattern: SimulatorConfig['pattern'];
+    intensity: SimulatorConfig['intensity'];
+    max_requests: number;
+  }) =>
     request<Experiment>('/experiments/run', {
       method: 'POST',
       body: JSON.stringify(req),

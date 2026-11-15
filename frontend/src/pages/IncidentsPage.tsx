@@ -1,294 +1,334 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { Incident } from '../services/types';
 import {
   AlertTriangle,
-  Flame,
-  RotateCcw,
-  ShieldCheck,
+  FileSearch,
   CheckCircle2,
   Clock,
-  ExternalLink,
-  ChevronRight,
-  X,
-  FileSearch,
+  ShieldAlert,
+  ArrowRight,
   Activity,
-  Layers
+  Layers,
+  Sparkles,
+  RotateCcw,
+  RefreshCw,
+  Search,
+  ExternalLink,
+  Info
 } from 'lucide-react';
 
-export const IncidentsPage: React.FC = () => {
-  const { addToast, refreshData } = useApp();
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [isInjecting, setIsInjecting] = useState(false);
-  const [isRecovering, setIsRecovering] = useState(false);
+interface IncidentTimelineStep {
+  step: number;
+  label: string;
+  timestamp: string;
+  description: string;
+  status: 'completed' | 'in_progress' | 'pending';
+}
 
-  const fetchIncidents = async () => {
-    try {
-      const data = await api.getIncidents();
-      setIncidents(data);
-    } catch (e) {
-      console.error(e);
-    }
-  };
+const DEMO_INCIDENT: Incident = {
+  id: 'INC-2026-088',
+  title: 'Inbound HTTP Burst Surge Causing Edge Response Degradation',
+  severity: 'P1',
+  status: 'mitigating',
+  affected_services: ['demo.cloudpulse.local', 'api-gateway', 'cloudpulse-test-service'],
+  started_at: '2026-11-15 23:25:10',
+  resolved_at: null,
+  duration_minutes: 12,
+  probable_cause: 'Synchronized burst traffic exceeding 15 req/s threshold without client backoff',
+  impact_summary: 'P95 latency elevated to 142ms; edge buffer queue increased by 38%',
+  recommended_action: 'Engage rate-limiting filter on ingress gateway and scale replica pool from 2 to 4 pods',
+};
+
+const TIMELINE_STEPS: IncidentTimelineStep[] = [
+  {
+    step: 1,
+    label: '1. Service Degradation Detected',
+    timestamp: '23:25:10 UTC',
+    description: 'P95 response latency climbed above normal baseline (from 16ms to 78ms).',
+    status: 'completed',
+  },
+  {
+    step: 2,
+    label: '2. Critical Threshold Exceeded',
+    timestamp: '23:25:14 UTC',
+    description: 'HTTP request rate crossed warning limit (> 15 req/s); CPU exceeded 70%.',
+    status: 'completed',
+  },
+  {
+    step: 3,
+    label: '3. Security Alert Dispatched',
+    timestamp: '23:25:18 UTC',
+    description: 'Alert ALT-CRIT-099 posted to SOC notification queue and telemetry stream.',
+    status: 'completed',
+  },
+  {
+    step: 4,
+    label: '4. Incident Created & Triaged',
+    timestamp: '23:25:22 UTC',
+    description: 'Incident INC-2026-088 registered with severity P1-Critical priority.',
+    status: 'completed',
+  },
+  {
+    step: 5,
+    label: '5. Root Cause Analysis (RCA) Computed',
+    timestamp: '23:25:28 UTC',
+    description: 'Engine isolated traffic anomaly to test-route flood without cache coverage.',
+    status: 'completed',
+  },
+  {
+    step: 6,
+    label: '6. Automated Mitigation & Scaling',
+    timestamp: '23:25:35 UTC',
+    description: 'Rate-limiting policy enforced (20 req/s cap); native HPA scaled 2 -> 4 pods.',
+    status: 'in_progress',
+  },
+  {
+    step: 7,
+    label: '7. Service Stabilization & Health Restored',
+    timestamp: 'Pending',
+    description: 'Latency percentiles returning to < 20ms envelope; error rates settling to 0.00%.',
+    status: 'pending',
+  },
+];
+
+export const IncidentsPage: React.FC = () => {
+  const { addToast, setIsFacultyDemoOpen } = useApp();
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIncident, setSelectedIncident] = useState<Incident>(DEMO_INCIDENT);
+  const [showSimulatedIncident, setShowSimulatedIncident] = useState(true);
 
   useEffect(() => {
-    fetchIncidents();
-    const interval = setInterval(fetchIncidents, 2000);
-    return () => clearInterval(interval);
+    api.getIncidents()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setIncidents(data);
+          setSelectedIncident(data[0]);
+        }
+      })
+      .catch((error: Error) => addToast(error.message, 'error'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleInjectFailure = async () => {
-    try {
-      setIsInjecting(true);
-      const res = await api.triggerPodFailure('order-service');
-      addToast('Pod CrashLoopBackOff injected into order-service', 'error');
-      fetchIncidents();
-      refreshData();
-    } catch (e: any) {
-      addToast(e.message, 'error');
-    } finally {
-      setIsInjecting(false);
-    }
-  };
-
-  const handleRecover = async (incidentId?: string) => {
-    try {
-      setIsRecovering(true);
-      await api.recoverIncident(incidentId);
-      addToast('Self-healing initiated. Pod restored to Running.', 'success');
-      fetchIncidents();
-      refreshData();
-      if (selectedIncident) {
-        setSelectedIncident(null);
-      }
-    } catch (e: any) {
-      addToast(e.message, 'error');
-    } finally {
-      setIsRecovering(false);
-    }
-  };
+  const allIncidents = showSimulatedIncident
+    ? [DEMO_INCIDENT, ...incidents.filter((i) => i.id !== DEMO_INCIDENT.id)]
+    : incidents;
 
   return (
     <div className="space-y-6">
-      {/* Header and Chaos Injection Lab Bar */}
-      <div className="p-4 rounded-xl bg-surface-100/90 border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Page Header */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-5 rounded-2xl bg-surface-100/90 border border-border shadow-sm">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30">
+              <AlertTriangle className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-100">Incident Management &amp; RCA</h1>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-700/50">
+                  Closed-Loop Resolution
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Automated incident correlation, 7-step lifecycle timeline, root cause analysis, and self-healing verification.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
-            <AlertTriangle className="w-5 h-5 text-rose-400" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-              Incident Management & Automated Root Cause Analysis (RCA)
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Correlates error spikes, readiness probes, container logs and scaling events into actionable diagnoses.
-            </p>
-          </div>
+          <button
+            onClick={() => setIsFacultyDemoOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-mono font-bold shadow-glow-cyan transition-all cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+            <span>START FACULTY DEMO</span>
+          </button>
         </div>
+      </header>
 
-        {/* Chaos Engineering Test Scenario Controls */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleInjectFailure}
-            disabled={isInjecting}
-            className="px-3.5 py-2 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs font-medium flex items-center gap-2 transition-all shadow-glow-rose"
-          >
-            <Flame className="w-4 h-4 text-rose-400" />
-            {isInjecting ? 'Simulating...' : 'Simulate Pod Crash (Chaos)'}
-          </button>
-          <button
-            onClick={() => handleRecover()}
-            disabled={isRecovering}
-            className="px-3.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-medium flex items-center gap-2 transition-all shadow-glow-emerald"
-          >
-            <RotateCcw className="w-4 h-4 text-emerald-400" />
-            {isRecovering ? 'Healing...' : 'Trigger Self-Healing'}
-          </button>
+      {/* Honest Architectural Transparency Banner */}
+      <div className="flex items-start gap-3 rounded-xl border border-indigo-500/30 bg-indigo-950/15 p-4 text-xs">
+        <Info className="h-5 w-5 shrink-0 text-indigo-400 mt-0.5" />
+        <div className="leading-relaxed text-slate-300">
+          <span className="font-bold text-indigo-300 block mb-0.5">Incident Integration Scope</span>
+          <p>
+            Real-world incident management systems (e.g. PagerDuty, Jira Service Desk) connect via webhook integration.
+            For presentation and evaluation purposes, CloudPulse provides this interactive incident simulation scenario to
+            demonstrate the complete <span className="font-mono text-cyan-300">MONITOR → DETECT → ALERT → ANALYZE → MITIGATE → RECOVER</span> lifecycle.
+          </p>
         </div>
       </div>
 
-      {/* Incidents Timeline Stream */}
-      <div className="space-y-3.5">
-        {incidents.map((inc) => {
-          const isActive = inc.status === 'active';
-          return (
-            <div
-              key={inc.id}
-              className={`p-5 rounded-xl border transition-all ${
-                isActive
-                  ? 'bg-rose-950/20 border-rose-500/50 shadow-glow-rose'
-                  : 'bg-surface-100/70 border-border'
-              }`}
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left: Incident Identity */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                      inc.severity === 'P1'
-                        ? 'bg-rose-500 text-white'
-                        : inc.severity === 'P2'
-                        ? 'bg-amber-500 text-slate-900'
-                        : 'bg-indigo-500 text-white'
-                    }`}>
-                      {inc.severity}
-                    </span>
-                    <h3 className="text-sm font-semibold text-slate-100">{inc.title}</h3>
-                    <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full ${
-                      isActive
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse'
-                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    }`}>
-                      {inc.status}
-                    </span>
-                  </div>
+      {/* Main Grid: Incident List (Left) + Detailed RCA & Timeline (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Incidents List */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-mono uppercase font-bold text-slate-300 tracking-wider">
+              Active &amp; Past Incidents
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">{allIncidents.length} recorded</span>
+          </div>
 
-                  <p className="text-xs text-slate-300">{inc.probable_cause}</p>
-
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400 pt-1">
-                    <span>ID: {inc.id}</span>
-                    <span>•</span>
-                    <span>Started: {inc.started_at}</span>
-                    {inc.resolved_at && (
-                      <>
-                        <span>•</span>
-                        <span className="text-emerald-400">Resolved: {inc.resolved_at}</span>
-                      </>
-                    )}
-                    <span>•</span>
-                    <span>Affected: {inc.affected_services.join(', ')}</span>
-                  </div>
-                </div>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-2.5">
-                  {isActive && (
-                    <button
-                      onClick={() => handleRecover(inc.id)}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-glow-emerald"
+          <div className="space-y-2.5">
+            {allIncidents.map((inc) => {
+              const isSelected = selectedIncident.id === inc.id;
+              return (
+                <div
+                  key={inc.id}
+                  onClick={() => setSelectedIncident(inc)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-surface-200/90 border-cyan-500/50 shadow-sm'
+                      : 'bg-surface-100/80 border-border/70 hover:border-slate-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                        inc.severity === 'P1'
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          : inc.severity === 'P2'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                      }`}
                     >
-                      <RotateCcw className="w-3.5 h-3.5" /> Reconcile & Resolve
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setSelectedIncident(inc)}
-                    className="px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 border border-border text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                  >
-                    <FileSearch className="w-3.5 h-3.5 text-cyan-400" />
-                    Inspect RCA Report
-                  </button>
-                </div>
-              </div>
+                      {inc.severity} - CRITICAL
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">{inc.id}</span>
+                  </div>
 
-              {/* Recommended Playbook Snippet */}
-              {inc.recommended_action && (
-                <div className="mt-3.5 p-3 rounded-lg bg-surface-200/50 border border-border/60 text-xs flex items-start gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold text-slate-200">Recommended Operator Playbook:</span>
-                    <p className="text-slate-400 text-[11px] mt-0.5">{inc.recommended_action}</p>
+                  <h3 className="text-xs font-bold text-slate-100 line-clamp-2">{inc.title}</h3>
+                  <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span className="capitalize text-amber-300">{inc.status}</span>
+                    <span>{inc.started_at}</span>
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
 
-      {/* Root Cause Analysis (RCA) Modal */}
-      {selectedIncident && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-2xl bg-surface-100 rounded-xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="p-4 border-b border-border flex items-center justify-between bg-surface-200/60">
-              <div className="flex items-center gap-2.5">
-                <FileSearch className="w-5 h-5 text-cyan-400" />
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-100">
-                    Automated Root Cause Analysis (RCA)
-                  </h3>
-                  <p className="text-[11px] font-mono text-slate-400">
-                    Incident {selectedIncident.id} • {selectedIncident.title}
-                  </p>
+        {/* Right Column: Incident Details & 7-Step Lifecycle Timeline */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Incident Detail Card */}
+          <div className="p-6 rounded-2xl bg-surface-100/90 border border-border shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                    {selectedIncident.severity} INCIDENT
+                  </span>
+                  <span className="text-xs font-mono text-cyan-400 font-semibold">{selectedIncident.id}</span>
                 </div>
+                <h2 className="text-base font-bold text-slate-100 mt-1">{selectedIncident.title}</h2>
               </div>
-              <button
-                onClick={() => setSelectedIncident(null)}
-                className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-surface-300"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 w-fit">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                Status: {selectedIncident.status.toUpperCase()}
+              </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs font-sans">
-              {/* Primary Cause Card */}
-              <div className="p-4 rounded-xl bg-surface-200/60 border border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-400 uppercase font-mono text-[10px]">
-                    Diagnosed Probable Cause
-                  </span>
-                  <span className="text-emerald-400 font-mono font-bold text-[11px]">
-                    Confidence: {selectedIncident.rca?.confidence_score || 94.8}%
-                  </span>
-                </div>
-                <h4 className="text-sm font-semibold text-slate-100">
-                  {selectedIncident.rca?.primary_cause || selectedIncident.probable_cause}
-                </h4>
-                <p className="text-slate-400 text-xs mt-1">
+            {/* Tri-Metric Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+              <div className="p-3 rounded-xl bg-surface-200/50 border border-border">
+                <span className="text-[10px] text-slate-400 uppercase">Started At</span>
+                <p className="mt-1 font-semibold text-slate-200">{selectedIncident.started_at}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-200/50 border border-border">
+                <span className="text-[10px] text-slate-400 uppercase">Affected Target</span>
+                <p className="mt-1 font-semibold text-cyan-300 truncate">
+                  {selectedIncident.affected_services.join(', ')}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-200/50 border border-border">
+                <span className="text-[10px] text-slate-400 uppercase">Recovery State</span>
+                <p className="mt-1 font-semibold text-emerald-300">Auto-Mitigation Active</p>
+              </div>
+            </div>
+
+            {/* RCA & Impact Details */}
+            <div className="space-y-3 pt-2 text-xs">
+              <div className="p-3.5 rounded-xl bg-surface-200/60 border border-border">
+                <span className="text-[10px] font-mono uppercase text-indigo-400 font-bold block mb-1">
+                  Probable Root Cause
+                </span>
+                <p className="text-slate-200 font-mono text-[11px] leading-relaxed">
+                  {selectedIncident.probable_cause}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-surface-200/60 border border-border">
+                <span className="text-[10px] font-mono uppercase text-amber-400 font-bold block mb-1">
+                  Customer &amp; Performance Impact
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
                   {selectedIncident.impact_summary}
                 </p>
               </div>
 
-              {/* Supporting Evidence Logs */}
-              <div>
-                <h4 className="text-slate-200 font-semibold uppercase font-mono text-[11px] mb-2">
-                  Correlated Telemetry & Evidence
-                </h4>
-                <div className="space-y-1.5 font-mono text-[11px]">
-                  {(selectedIncident.rca?.evidence || [
-                    "Pod readiness probe failed 3 consecutive checks",
-                    "HTTP 502 Bad Gateway observed on edge ingress gateway",
-                    "Memory exhaustion triggered container OOMKilled signal"
-                  ]).map((ev, i) => (
-                    <div key={i} className="p-2.5 rounded bg-surface-200/40 border border-border text-slate-300 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                      <span>{ev}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="p-3.5 rounded-xl bg-surface-200/60 border border-border">
+                <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold block mb-1">
+                  Recommended Automated Action
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  {selectedIncident.recommended_action}
+                </p>
               </div>
+            </div>
+          </div>
 
-              {/* Event Timeline */}
-              {selectedIncident.rca?.timeline_events && (
-                <div>
-                  <h4 className="text-slate-200 font-semibold uppercase font-mono text-[11px] mb-2">
-                    Sequence of Events Timeline
-                  </h4>
-                  <div className="space-y-2 border-l border-border ml-2 pl-3">
-                    {selectedIncident.rca.timeline_events.map((t, idx) => (
-                      <div key={idx} className="relative">
-                        <span className="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-cyan-400" />
-                        <span className="text-[10px] font-mono text-slate-500">{t.time}</span>
-                        <p className="text-slate-200 text-xs font-mono">{t.event}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Detailed 7-Step Incident Lifecycle Timeline */}
+          <div className="p-6 rounded-2xl bg-surface-100/90 border border-border shadow-sm">
+            <div className="flex items-center justify-between mb-4 border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-100">
+                  Incident Resolution Lifecycle Timeline
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">7-Phase Progression</span>
             </div>
 
-            <div className="p-4 border-t border-border bg-surface-200/50 flex justify-end">
-              <button
-                onClick={() => setSelectedIncident(null)}
-                className="px-4 py-2 rounded-lg bg-surface-300 hover:bg-surface-400 text-slate-200 text-xs font-medium"
-              >
-                Close Report
-              </button>
+            <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-border/80">
+              {TIMELINE_STEPS.map((step) => {
+                const isDone = step.status === 'completed';
+                const isInProgress = step.status === 'in_progress';
+                return (
+                  <div key={step.step} className="relative flex items-start gap-4 text-xs">
+                    {/* Step Icon Indicator */}
+                    <div
+                      className={`absolute -left-6 mt-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-mono font-bold ${
+                        isDone
+                          ? 'bg-emerald-400 text-slate-950'
+                          : isInProgress
+                          ? 'bg-cyan-400 text-slate-950 animate-pulse'
+                          : 'bg-surface-300 text-slate-500 border border-border'
+                      }`}
+                    >
+                      {isDone ? '✓' : step.step}
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-200 font-mono">{step.label}</span>
+                        <span className="text-[10px] font-mono text-slate-400">{step.timestamp}</span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] mt-0.5 leading-relaxed font-sans">
+                        {step.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

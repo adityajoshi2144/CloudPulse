@@ -65,7 +65,7 @@ export const CacheAnalyticsPage: React.FC = () => {
     }
   };
 
-  const hitRatio = stats?.hit_ratio_percent || 88.6;
+  const hitRatio = stats?.hit_ratio_percent;
 
   return (
     <div className="space-y-6">
@@ -81,7 +81,7 @@ export const CacheAnalyticsPage: React.FC = () => {
                 Distributed Cache Analytics & Memory Subsystem
               </h2>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-950/60 text-indigo-300 border border-indigo-700/40">
-                {stats?.engine || 'Redis L2 Distributed Engine'}
+                {stats?.engine || 'Checking cache connection…'}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -110,12 +110,12 @@ export const CacheAnalyticsPage: React.FC = () => {
             <span>Cache Hit Ratio</span>
             <Gauge className="w-4 h-4 text-emerald-400" />
           </div>
-          <p className="text-2xl font-bold font-mono text-emerald-400">{hitRatio}%</p>
+          <p className="text-2xl font-bold font-mono text-emerald-400">{hitRatio == null ? '—' : `${hitRatio}%`}</p>
           <div className="w-full h-1.5 bg-surface-300 rounded-full mt-2 overflow-hidden">
-            <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${hitRatio}%` }} />
+            <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${hitRatio ?? 0}%` }} />
           </div>
           <span className="text-[10px] text-slate-400 font-mono mt-1 block">
-            {stats?.hits.toLocaleString() || 2480} Hits / {stats?.misses.toLocaleString() || 412} Misses
+            {stats ? `${stats.hits.toLocaleString()} Hits / ${stats.misses.toLocaleString()} Misses` : 'Cache counters unavailable'}
           </span>
         </div>
 
@@ -124,7 +124,7 @@ export const CacheAnalyticsPage: React.FC = () => {
             <span>Average Read Latency</span>
             <Clock className="w-4 h-4 text-cyan-400" />
           </div>
-          <p className="text-2xl font-bold font-mono text-cyan-400">{stats?.avg_latency_ms || 1.1} ms</p>
+          <p className="text-2xl font-bold font-mono text-cyan-400">{stats?.avg_latency_ms == null ? '—' : `${stats.avg_latency_ms} ms`}</p>
           <span className="text-[10px] text-slate-400 font-mono mt-2 block">
             Sub-millisecond high-speed RAM retrieval
           </span>
@@ -135,7 +135,7 @@ export const CacheAnalyticsPage: React.FC = () => {
             <span>Allocated Memory</span>
             <HardDrive className="w-4 h-4 text-indigo-400" />
           </div>
-          <p className="text-2xl font-bold font-mono text-indigo-400">{stats?.used_memory_human || '4.2 MB'}</p>
+          <p className="text-2xl font-bold font-mono text-indigo-400">{stats?.used_memory_human ?? '—'}</p>
           <span className="text-[10px] text-slate-400 font-mono mt-2 block">
             Max Memory Quota: 256 MB (LRU Eviction)
           </span>
@@ -146,9 +146,9 @@ export const CacheAnalyticsPage: React.FC = () => {
             <span>Keys & Evictions</span>
             <Layers className="w-4 h-4 text-amber-400" />
           </div>
-          <p className="text-2xl font-bold font-mono text-slate-100">{stats?.total_keys || 14} Keys</p>
+          <p className="text-2xl font-bold font-mono text-slate-100">{stats?.total_keys ?? '—'} Keys</p>
           <span className="text-[10px] text-slate-400 font-mono mt-2 block">
-            Evictions: {stats?.evictions || 0} • Commands: {stats?.total_commands_processed || 2900}
+            Evictions: {stats?.evictions ?? '—'} • Commands: {stats?.total_commands_processed ?? '—'}
           </span>
         </div>
       </div>

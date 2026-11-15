@@ -12,11 +12,11 @@ class InMemoryCacheManager:
     def __init__(self, max_keys: int = 5000):
         self.store: Dict[str, Dict[str, Any]] = {}
         self.max_keys = max_keys
-        self.hits: int = 2480
-        self.misses: int = 412
-        self.evictions: int = 14
-        self.total_commands: int = 2906
-        self.latency_samples: list = [0.8, 1.2, 0.9, 1.1, 1.4, 0.7, 1.0]
+        self.hits: int = 0
+        self.misses: int = 0
+        self.evictions: int = 0
+        self.total_commands: int = 0
+        self.latency_samples: list[float] = []
 
     def _cleanup_expired(self):
         now = time.time()
@@ -30,7 +30,7 @@ class InMemoryCacheManager:
         self.total_commands += 1
         val_obj = self.store.get(key)
         elapsed = (time.perf_counter() - t0) * 1000
-        self.latency_samples.append(round(elapsed + 0.5, 2))
+        self.latency_samples.append(round(elapsed, 3))
         if len(self.latency_samples) > 50:
             self.latency_samples.pop(0)
 
@@ -58,7 +58,7 @@ class InMemoryCacheManager:
             "created_at": time.time()
         }
         elapsed = (time.perf_counter() - t0) * 1000
-        self.latency_samples.append(round(elapsed + 0.6, 2))
+        self.latency_samples.append(round(elapsed, 3))
         return True
 
     async def delete(self, key: str) -> int:
@@ -79,21 +79,22 @@ class InMemoryCacheManager:
     async def get_stats(self) -> dict:
         self._cleanup_expired()
         total_ops = self.hits + self.misses
-        hit_ratio = round((self.hits / total_ops * 100), 2) if total_ops > 0 else 85.7
-        total_bytes = sum(v.get("size_bytes", 128) for v in self.store.values()) + (len(self.store) * 64)
-        avg_latency = round(sum(self.latency_samples[-10:]) / max(1, len(self.latency_samples[-10:])), 2)
+        hit_ratio = round((self.hits / total_ops * 100), 2) if total_ops > 0 else 0.0
+        total_bytes = sum(v.get("size_bytes", 0) for v in self.store.values())
+        recent_samples = self.latency_samples[-10:]
+        avg_latency = round(sum(recent_samples) / len(recent_samples), 3) if recent_samples else None
         
         return {
             "is_real_redis": False,
             "engine": "CloudPulse In-Memory High-Speed Cache (Redis-Compatible)",
-            "connected_clients": 4,
+            "connected_clients": 0,
             "total_keys": len(self.store),
             "hits": self.hits,
             "misses": self.misses,
             "hit_ratio_percent": hit_ratio,
             "evictions": self.evictions,
-            "used_memory_bytes": max(1048576, total_bytes * 1024),
-            "used_memory_human": f"{round(max(1.0, (total_bytes * 1024) / 1048576), 2)} MB",
+            "used_memory_bytes": total_bytes,
+            "used_memory_human": f"{round(total_bytes / 1048576, 3)} MB",
             "avg_latency_ms": avg_latency,
             "total_commands_processed": self.total_commands,
             "sample_keys": [
@@ -118,42 +119,40 @@ class CacheService:
         except Exception as e:
             self.use_real_redis = False
             logger.info("Redis not detected (%s); using in-memory high-speed cache manager", str(e))
-            # Seed cache with initial operational keys
-            await self.in_memory.set("service:auth:session_tokens", json.dumps({"count": 420}), ex=3600)
-            await self.in_memory.set("service:catalog:product_cache_v2", json.dumps({"items": 1500}), ex=7200)
-            await self.in_memory.set("config:hpa:order_service", json.dumps({"target_cpu": 70, "min": 2, "max": 10}), ex=86400)
-            await self.in_memory.set("telemetry:aggregated:last_5m", json.dumps({"avg_rps": 124.5}), ex=300)
-
     async def get(self, key: str) -> Optional[str]:
         if self.use_real_redis and self.redis:
             try:
                 return await self.redis.get(key)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis GET failed; using in-memory fallback: %s", exc)
+                self.use_real_redis = False
         return await self.in_memory.get(key)
 
     async def set(self, key: str, value: str, ex: Optional[int] = None) -> bool:
         if self.use_real_redis and self.redis:
             try:
                 return await self.redis.set(key, value, ex=ex)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis SET failed; using in-memory fallback: %s", exc)
+                self.use_real_redis = False
         return await self.in_memory.set(key, value, ex=ex)
 
     async def delete(self, key: str) -> int:
         if self.use_real_redis and self.redis:
             try:
                 return await self.redis.delete(key)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis DELETE failed; using in-memory fallback: %s", exc)
+                self.use_real_redis = False
         return await self.in_memory.delete(key)
 
     async def flush(self) -> bool:
         if self.use_real_redis and self.redis:
             try:
                 await self.redis.flushall()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis FLUSH failed; flushing in-memory fallback: %s", exc)
+                self.use_real_redis = False
         return await self.in_memory.flushall()
 
     async def get_stats(self) -> dict:
@@ -161,13 +160,13 @@ class CacheService:
             try:
                 info = await self.redis.info()
                 keys = await self.redis.keys("*")
-                hits = int(info.get("keyspace_hits", 1))
+                hits = int(info.get("keyspace_hits", 0))
                 misses = int(info.get("keyspace_misses", 0))
                 total = hits + misses
                 hit_ratio = round((hits / total * 100), 2) if total > 0 else 0
                 return {
                     "is_real_redis": True,
-                    "engine": f"Redis Server v{info.get('redis_version', '7.2')}",
+                    "engine": f"Redis Server v{info.get('redis_version', 'unknown')}",
                     "connected_clients": int(info.get("connected_clients", 1)),
                     "total_keys": len(keys),
                     "hits": hits,
@@ -176,12 +175,13 @@ class CacheService:
                     "evictions": int(info.get("evicted_keys", 0)),
                     "used_memory_bytes": int(info.get("used_memory", 0)),
                     "used_memory_human": info.get("used_memory_human", "0M"),
-                    "avg_latency_ms": 1.1,
+                    "avg_latency_ms": None,
                     "total_commands_processed": int(info.get("total_commands_processed", 0)),
                     "sample_keys": [{"key": k, "size": 128, "ttl": -1} for k in keys[:15]]
                 }
             except Exception as e:
                 logger.warning("Error fetching real Redis stats: %s", str(e))
+                self.use_real_redis = False
         return await self.in_memory.get_stats()
 
 cache_service = CacheService()

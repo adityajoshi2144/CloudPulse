@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any
 from app.models.entities import ScalingPolicyUpdate
 from app.core.telemetry_state import telemetry_state
 from app.services.autoscaler import autoscaler_service
@@ -19,12 +18,13 @@ async def get_scaling_policies():
             "target_cpu": s_data.get("target_cpu", 70),
             "min_replicas": s_data.get("min_replicas", 2),
             "max_replicas": s_data.get("max_replicas", 10),
-            "current_replicas": len(telemetry_state.pods.get(s_id, [])),
-            "current_cpu": s_data.get("cpu_percent", 35.0),
+            "current_replicas": s_data.get("replicas"),
+            "current_cpu": s_data.get("cpu_percent"),
             "scale_up_cooldown": settings.SCALE_UP_COOLDOWN_SEC,
             "scale_down_cooldown": settings.SCALE_DOWN_COOLDOWN_SEC,
-            "is_hpa_active": True,
-            "orchestrator": "Kubernetes HPA (v2)" if settings.KUBERNETES_ENABLED else "CloudPulse Native HPA Engine"
+            "is_hpa_active": False,
+            "orchestrator": "Not integrated",
+            "execution_mode": "policy_only",
         })
     return policies
 
@@ -39,8 +39,10 @@ async def update_scaling_policy(service_id: str, policy: ScalingPolicyUpdate):
     svc["max_replicas"] = policy.max_replicas
     
     return {
-        "status": "success",
+        "status": "updated",
         "service_id": service_id,
+        "execution_mode": "process_local_policy_only",
+        "infrastructure_changed": False,
         "policy": {
             "target_cpu": svc["target_cpu"],
             "min_replicas": svc["min_replicas"],
@@ -54,8 +56,7 @@ async def get_scaling_events():
 
 @router.post("/manual")
 async def trigger_manual_scale(service_id: str, replicas: int):
-    try:
-        event = autoscaler_service.manual_scale(service_id, replicas, operator="UI Operator")
-        return {"status": "success", "event": event}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    raise HTTPException(
+        status_code=501,
+        detail="Manual replica changes are unavailable: no Kubernetes adapter is configured.",
+    )

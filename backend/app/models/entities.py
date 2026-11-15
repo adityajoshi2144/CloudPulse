@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, JSON
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from app.core.database import Base
 
 # ==========================================
@@ -124,6 +124,12 @@ class ScalingPolicyUpdate(BaseModel):
     scale_up_cooldown: int = Field(15, ge=0)
     scale_down_cooldown: int = Field(30, ge=0)
 
+    @model_validator(mode="after")
+    def validate_replica_bounds(self):
+        if self.min_replicas > self.max_replicas:
+            raise ValueError("min_replicas cannot exceed max_replicas.")
+        return self
+
 class ScalingEventDTO(BaseModel):
     id: int
     service_id: str
@@ -136,12 +142,14 @@ class ScalingEventDTO(BaseModel):
     is_real_k8s: bool
 
 class SimulatorConfig(BaseModel):
-    pattern: str = "spike" # normal, spike, sustained, gradual, reduction
-    virtual_users: int = Field(500, ge=10, le=10000)
-    duration_seconds: int = Field(60, ge=10, le=600)
-    ramp_up_seconds: int = Field(10, ge=0, le=60)
-    target_service: str = "all" # all, or specific service_id
-    safe_simulation_mode: bool = True
+    pattern: Literal["normal", "spike", "flood", "burst", "resource", "failure", "gradual"] = "spike"
+    virtual_users: int = Field(4, ge=1, le=10)
+    intensity: Literal["low", "medium", "high"] = "medium"
+    duration_seconds: int = Field(15, ge=1, le=60)
+    ramp_up_seconds: int = Field(5, ge=0, le=60)
+    max_requests: int = Field(200, ge=1, le=1000)
+    target_service: Literal["cloudpulse-test-service"] = "cloudpulse-test-service"
+    safe_simulation_mode: Literal[True] = True
 
 class IncidentActionRequest(BaseModel):
     action: str # "restart_pod", "drain_traffic", "revert_deployment", "resolve"
@@ -155,7 +163,9 @@ class AlertThresholdConfig(BaseModel):
     enabled: bool = True
 
 class ExperimentRunRequest(BaseModel):
-    name: str
-    test_duration_seconds: int = 15
-    virtual_users: int = 250
-    target_endpoint: str = "/api/cache/test-cached"
+    name: str = Field(..., min_length=1, max_length=100)
+    test_duration_seconds: int = Field(15, ge=1, le=60)
+    virtual_users: int = Field(2, ge=1, le=10)
+    pattern: Literal["normal", "spike", "flood", "burst", "resource", "failure", "gradual"] = "spike"
+    intensity: Literal["low", "medium", "high"] = "low"
+    max_requests: int = Field(200, ge=1, le=1000)

@@ -16,9 +16,8 @@ import {
   ShieldCheck,
   History,
   Settings,
-  Flame,
-  RotateCcw,
-  Gauge
+  Gauge,
+  FileText
 } from 'lucide-react';
 
 interface CommandItem {
@@ -34,9 +33,7 @@ export const CommandPalette: React.FC = () => {
     isCommandPaletteOpen,
     setIsCommandPaletteOpen,
     setActiveTab,
-    setEnvironment,
-    addToast,
-    refreshData
+    addToast
   } = useApp();
 
   const [query, setQuery] = useState('');
@@ -66,24 +63,45 @@ export const CommandPalette: React.FC = () => {
     },
     {
       id: 'nav-infrastructure',
-      title: 'Open 3D Infrastructure Observatory',
+      title: 'Open Service Dependency Map',
       category: 'Navigation',
       icon: Box,
       action: () => setActiveTab('infrastructure'),
     },
     {
       id: 'nav-scaling',
-      title: 'Configure Auto-Scaling & HPA Policies',
+      title: 'Configure local scaling policies (not connected to Kubernetes)',
       category: 'Navigation',
       icon: TrendingUp,
       action: () => setActiveTab('scaling'),
     },
     {
       id: 'nav-simulator',
-      title: 'Launch Interactive Traffic Simulator',
+      title: 'Open Attack & Stress Lab',
       category: 'Navigation',
       icon: Zap,
       action: () => setActiveTab('simulator'),
+    },
+    {
+      id: 'nav-risk',
+      title: 'Open Explainable AI Risk Analysis',
+      category: 'Navigation',
+      icon: ShieldCheck,
+      action: () => setActiveTab('risk'),
+    },
+    {
+      id: 'nav-health',
+      title: 'Open System Health',
+      category: 'Navigation',
+      icon: Activity,
+      action: () => setActiveTab('health'),
+    },
+    {
+      id: 'nav-reports',
+      title: 'Open Simulation Reports',
+      category: 'Navigation',
+      icon: FileText,
+      action: () => setActiveTab('reports'),
     },
     {
       id: 'nav-incidents',
@@ -101,7 +119,7 @@ export const CommandPalette: React.FC = () => {
     },
     {
       id: 'nav-experiments',
-      title: 'Run Performance A/B Benchmark',
+      title: 'Run measured local workload experiment',
       category: 'Navigation',
       icon: FlaskConical,
       action: () => setActiveTab('experiments'),
@@ -115,52 +133,23 @@ export const CommandPalette: React.FC = () => {
     },
     {
       id: 'act-sim-spike',
-      title: 'Start Traffic Surge Simulation (300 RPS Spike)',
+      title: 'Start bounded local traffic spike (up to 2 requests/sec)',
       category: 'Actions',
       icon: Zap,
       action: async () => {
         try {
           await api.startSimulator({
             pattern: 'spike',
-            virtual_users: 500,
-            duration_seconds: 60,
-            ramp_up_seconds: 10,
-            target_service: 'all',
+            virtual_users: 2,
+            intensity: 'low',
+            duration_seconds: 15,
+            ramp_up_seconds: 5,
+            max_requests: 100,
+            target_service: 'cloudpulse-test-service',
             safe_simulation_mode: true,
           });
           setActiveTab('simulator');
-          addToast('Traffic Spike simulation started', 'success');
-        } catch (e: any) {
-          addToast(e.message, 'error');
-        }
-      },
-    },
-    {
-      id: 'act-chaos-crash',
-      title: 'Trigger Chaos: Pod Crash on order-service',
-      category: 'Actions',
-      icon: Flame,
-      action: async () => {
-        try {
-          await api.triggerPodFailure('order-service');
-          setActiveTab('incidents');
-          addToast('CrashLoopBackOff injected into order-service', 'error');
-          refreshData();
-        } catch (e: any) {
-          addToast(e.message, 'error');
-        }
-      },
-    },
-    {
-      id: 'act-recover',
-      title: 'Trigger Cluster Self-Healing Reconciliation',
-      category: 'Actions',
-      icon: RotateCcw,
-      action: async () => {
-        try {
-          await api.recoverIncident();
-          addToast('Self-healing completed. Healthy pods restored.', 'success');
-          refreshData();
+          addToast('Local traffic spike simulation started', 'success');
         } catch (e: any) {
           addToast(e.message, 'error');
         }

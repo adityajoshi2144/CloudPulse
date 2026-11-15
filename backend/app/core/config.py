@@ -22,7 +22,12 @@ class Settings(BaseSettings):
     PROMETHEUS_URL: str = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
     GRAFANA_URL: str = os.getenv("GRAFANA_URL", "http://localhost:3000")
     
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = [
+        "http://127.0.0.1:5174",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    ]
     
     # Telemetry and Simulation settings
     DEFAULT_CPU_TARGET: int = 70

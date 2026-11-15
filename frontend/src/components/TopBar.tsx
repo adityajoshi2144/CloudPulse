@@ -6,20 +6,23 @@ import {
   Bell,
   ChevronDown,
   Clock,
-  Layers,
   Zap,
   CheckCircle2,
   AlertCircle,
   X,
   ExternalLink,
-  ShieldAlert
+  ShieldCheck,
+  Globe,
+  Sun,
+  Moon,
+  Sparkles,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar }) => {
   const {
     activeTab,
-    environment,
-    setEnvironment,
     timeRange,
     setTimeRange,
     overview,
@@ -28,24 +31,38 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
     setIsCommandPaletteOpen,
     isNotificationOpen,
     setIsNotificationOpen,
-    setActiveTab
+    setActiveTab,
+    protectedWebsite,
+    setProtectedWebsite,
+    environment,
+    setEnvironment,
+    setIsFacultyDemoOpen,
+    theme,
+    toggleTheme,
+    wsConnected,
+    threatLevel,
   } = useApp();
 
-  const [showEnvDropdown, setShowEnvDropdown] = useState(false);
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [showWebsiteDropdown, setShowWebsiteDropdown] = useState(false);
+  const [showEnvDropdown, setShowEnvDropdown] = useState(false);
 
-  const environments = [
-    { id: 'production', label: 'Production (us-east-1)', color: 'bg-emerald-500' },
-    { id: 'staging', label: 'Staging (us-central-1)', color: 'bg-amber-500' },
-    { id: 'development', label: 'Dev-Cluster (Local Kind)', color: 'bg-cyan-500' },
+  const timeRanges = ['1m', '5m', '15m', '1h'];
+  const websites = [
+    'demo.cloudpulse.local',
+    'api.cloudpulse.local',
+    'store.cloudpulse.local',
   ];
-
-  const timeRanges = ['1m', '5m', '15m', '1h', '24h'];
+  const environments = [
+    'Production (Protected)',
+    'Staging',
+    'Simulation Lab',
+  ];
 
   return (
     <>
-      <header className="sticky top-0 z-30 h-16 bg-[#0a0d14]/80 backdrop-blur-md border-b border-border/80 px-4 lg:px-6 flex items-center justify-between">
-        {/* Left: Mobile Toggle & Page Indicator */}
+      <header className="sticky top-0 z-30 h-16 bg-[#090c14]/90 backdrop-blur-md border-b border-border/80 px-4 lg:px-6 flex items-center justify-between transition-colors">
+        {/* Left: Mobile Toggle & Page / Website Breadcrumbs */}
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenSidebar}
@@ -55,23 +72,91 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono uppercase text-slate-400 hidden sm:inline">Platform /</span>
-            <h1 className="text-sm font-semibold text-slate-100 capitalize tracking-tight">
-              {activeTab.replace('-', ' ')}
-            </h1>
+          {/* Protected Website Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowWebsiteDropdown(!showWebsiteDropdown)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-200/70 hover:bg-surface-200 border border-border/80 text-xs text-slate-200 font-mono transition-colors"
+              title="Select Protected Website Target"
+            >
+              <Globe className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-semibold text-slate-100">{protectedWebsite}</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {showWebsiteDropdown && (
+              <div className="absolute left-0 mt-1 w-56 bg-surface-100 rounded-xl border border-border shadow-2xl p-1 z-50 animate-in fade-in-50 duration-150">
+                <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase text-slate-400 border-b border-border/60">
+                  Select Protected Target
+                </div>
+                {websites.map((site) => (
+                  <button
+                    key={site}
+                    onClick={() => {
+                      setProtectedWebsite(site);
+                      setShowWebsiteDropdown(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between ${
+                      protectedWebsite === site
+                        ? 'bg-cyan-500/20 text-cyan-300 font-medium'
+                        : 'text-slate-300 hover:bg-surface-200'
+                    }`}
+                  >
+                    <span>{site}</span>
+                    {protectedWebsite === site && <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Environment Selector */}
+          <div className="relative hidden xl:block">
+            <button
+              onClick={() => setShowEnvDropdown(!showEnvDropdown)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-300/60 hover:bg-surface-200 border border-border/60 text-[11px] font-mono text-slate-300"
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span>{environment}</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+            {showEnvDropdown && (
+              <div className="absolute left-0 mt-1 w-48 bg-surface-100 rounded-xl border border-border shadow-2xl p-1 z-50">
+                {environments.map((env) => (
+                  <button
+                    key={env}
+                    onClick={() => {
+                      setEnvironment(env);
+                      setShowEnvDropdown(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 hover:bg-surface-200"
+                  >
+                    {env}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Center: Search / Command Palette Trigger */}
-        <div className="hidden md:flex items-center">
+        {/* Center: Faculty Demo Launcher Button */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsFacultyDemoOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-mono font-bold shadow-glow-cyan transition-all transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+            <span>START FACULTY DEMO</span>
+          </button>
+
+          {/* Command Palette Trigger */}
           <button
             onClick={() => setIsCommandPaletteOpen(true)}
-            className="flex items-center gap-3 px-3.5 py-1.5 rounded-lg bg-surface-200/60 hover:bg-surface-200 border border-border/70 text-slate-400 hover:text-slate-200 text-xs transition-all w-64 justify-between"
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-200/60 hover:bg-surface-200 border border-border/70 text-slate-400 hover:text-slate-200 text-xs transition-all w-52 justify-between"
           >
             <div className="flex items-center gap-2">
               <Search className="w-3.5 h-3.5" />
-              <span>Quick actions & telemetry...</span>
+              <span className="truncate">Search SOC...</span>
             </div>
             <kbd className="font-mono text-[10px] bg-surface-300 text-slate-400 px-1.5 py-0.5 rounded border border-border">
               ⌘K
@@ -79,19 +164,61 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
           </button>
         </div>
 
-        {/* Right: Actions, Filters & Profile */}
+        {/* Right: Telemetry, Simulator Banner, Notifications, Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Active Simulator Banner */}
           {simulator?.is_running && (
             <button
               onClick={() => setActiveTab('simulator')}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 text-xs font-mono animate-pulse hover:bg-cyan-900/60 transition-colors"
+              className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-950/90 border border-cyan-500/50 text-cyan-300 text-xs font-mono animate-pulse hover:bg-cyan-900/60 transition-colors"
             >
               <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">TRAFFIC SIMULATING: {simulator.pattern.toUpperCase()} ({simulator.progress_percent}%)</span>
+              <span className="hidden sm:inline">
+                SIMULATING: {simulator.pattern.toUpperCase()} ({simulator.progress_percent}%)
+              </span>
               <span className="sm:hidden font-semibold">SIM</span>
             </button>
           )}
+
+          {/* Threat Level Badge */}
+          <div
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono uppercase font-semibold ${
+              threatLevel === 'Critical'
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                : threatLevel === 'High Risk'
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                : threatLevel === 'Suspicious'
+                ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
+                : threatLevel === 'Monitoring'
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                threatLevel === 'Critical' ? 'bg-rose-400' : threatLevel === 'High Risk' ? 'bg-amber-400' : 'bg-emerald-400'
+              }`}
+            />
+            <span>Threat: {threatLevel}</span>
+          </div>
+
+          {/* Live WebSocket Status Indicator */}
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border/80 bg-surface-200/70 text-[11px] font-mono text-slate-300"
+            title={wsConnected ? 'WebSocket Telemetry Connected' : 'Telemetry Polling Mode (2s)'}
+          >
+            {wsConnected ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="hidden md:inline text-slate-300">Live WS</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                <span className="hidden md:inline text-slate-400">Polling</span>
+              </>
+            )}
+          </div>
 
           {/* Time Range Selector */}
           <div className="relative">
@@ -125,38 +252,15 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
             )}
           </div>
 
-          {/* Environment Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowEnvDropdown(!showEnvDropdown)}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface-200/70 hover:bg-surface-200 border border-border text-slate-200 text-xs"
-            >
-              <Layers className="w-3.5 h-3.5 text-slate-400" />
-              <span className="capitalize hidden lg:inline">{environment}</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
-            {showEnvDropdown && (
-              <div className="absolute right-0 mt-1 w-52 bg-surface-100 rounded-lg border border-border shadow-xl p-1 z-50">
-                {environments.map((env) => (
-                  <button
-                    key={env.id}
-                    onClick={() => {
-                      setEnvironment(env.id);
-                      setShowEnvDropdown(false);
-                    }}
-                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded text-xs ${
-                      environment === env.id
-                        ? 'bg-cyan-500/20 text-cyan-300 font-medium'
-                        : 'text-slate-300 hover:bg-surface-200'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${env.color}`} />
-                    <span>{env.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Light / Dark Mode Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-surface-200 border border-transparent hover:border-border transition-all"
+            aria-label="Toggle color theme"
+            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+          </button>
 
           {/* Notification Bell */}
           <button
@@ -173,7 +277,7 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
           {/* User Profile Avatar */}
           <div className="flex items-center gap-2 pl-1 border-l border-border/80">
             <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-[11px] font-semibold text-white font-mono shadow-sm">
-              CP
+              SOC
             </div>
           </div>
         </div>
@@ -181,11 +285,11 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
 
       {/* Notifications Drawer */}
       {isNotificationOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-80 bg-surface-100 border-l border-border shadow-2xl flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-200">
+        <div className="fixed inset-y-0 right-0 z-50 w-84 bg-surface-100 border-l border-border shadow-2xl flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-200">
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-cyan-400" />
-              <h2 className="text-sm font-semibold text-slate-100">Live Telemetry Feed</h2>
+              <h2 className="text-sm font-semibold text-slate-100">Website Protection Alerts</h2>
             </div>
             <button
               onClick={() => setIsNotificationOpen(false)}
@@ -196,41 +300,29 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             <div className="p-3 rounded-lg bg-surface-200/80 border border-border text-xs">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mb-1">
-                <span>AUTOSCALER</span>
-                <span>Just now</span>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-200 font-medium">Protection Status</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                  SHIELD ACTIVE
+                </span>
               </div>
-              <p className="text-slate-200 font-medium">HPA evaluation cycle completed</p>
-              <p className="text-slate-400 text-[11px] mt-0.5">All 14 active pods within 70% target utilization.</p>
-            </div>
-
-            {overview?.status !== 'healthy' && (
-              <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-500/30 text-xs">
-                <div className="flex items-center justify-between text-[11px] text-rose-400 font-mono mb-1">
-                  <span>INCIDENT DETECTED</span>
-                  <span>Active</span>
-                </div>
-                <p className="text-rose-200 font-medium">Order-service pod degradation</p>
-                <p className="text-slate-400 text-[11px] mt-0.5">High latency threshold breach; review Incident tab.</p>
+              <p className="text-slate-400 text-[11px] mt-1.5">
+                Target: <span className="font-mono text-cyan-300">{protectedWebsite}</span>
+              </p>
+              <p className="text-slate-400 text-[11px]">
+                API Status: {overview?.status ?? 'healthy'} · Observed RPS: {overview?.total_rps ?? 0}
+              </p>
+              <div className="mt-3 pt-2 border-t border-border/60">
                 <button
                   onClick={() => {
-                    setActiveTab('incidents');
+                    setActiveTab('alerts');
                     setIsNotificationOpen(false);
                   }}
-                  className="mt-2 text-rose-400 hover:text-rose-300 font-mono text-[10px] flex items-center gap-1 underline"
+                  className="w-full py-1.5 rounded bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors"
                 >
-                  View Incident & RCA <ExternalLink className="w-3 h-3" />
+                  View Alerts Center ({activeAlertsCount}) <ExternalLink className="w-3 h-3" />
                 </button>
               </div>
-            )}
-
-            <div className="p-3 rounded-lg bg-surface-200/80 border border-border text-xs">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mb-1">
-                <span>CACHE LAYER</span>
-                <span>5m ago</span>
-              </div>
-              <p className="text-slate-200 font-medium">Redis cache hit ratio steady at 88.6%</p>
-              <p className="text-slate-400 text-[11px] mt-0.5">P95 read latency measured at 1.2ms.</p>
             </div>
           </div>
         </div>

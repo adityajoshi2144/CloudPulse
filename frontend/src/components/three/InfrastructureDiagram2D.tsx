@@ -3,12 +3,6 @@ import { useApp } from '../../context/AppContext';
 import { ServiceItem } from '../../services/types';
 import {
   Globe,
-  Shield,
-  Server,
-  Database,
-  Cpu,
-  Layers,
-  Activity,
   ArrowDown
 } from 'lucide-react';
 
@@ -27,6 +21,7 @@ export const InfrastructureDiagram2D: React.FC<Diagram2DProps> = ({ onSelectServ
     const isSelected = selectedId === service.id;
     const isCritical = service.status === 'critical';
     const isDegraded = service.status === 'degraded';
+    const isKnownStatus = service.status === 'critical' || service.status === 'degraded' || service.status === 'healthy';
 
     return (
       <div
@@ -45,38 +40,25 @@ export const InfrastructureDiagram2D: React.FC<Diagram2DProps> = ({ onSelectServ
           <div className="flex items-center gap-2">
             <span
               className={`w-2 h-2 rounded-full ${
-                isCritical ? 'bg-rose-500 animate-ping' : isDegraded ? 'bg-amber-500' : 'bg-emerald-500'
+                isCritical ? 'bg-rose-500' : isDegraded ? 'bg-amber-500' : isKnownStatus ? 'bg-emerald-500' : 'bg-slate-500'
               }`}
             />
             <span className="text-xs font-semibold text-slate-100">{service.name.split(' ')[0]}</span>
           </div>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-300 text-cyan-300 border border-border">
-            {service.replicas} pods
+              {service.replicas === null ? 'Replicas not measured' : `${service.replicas} replicas`}
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
           <div>
             <span className="text-slate-400 text-[10px]">CPU:</span>
-            <p className="text-slate-200 font-medium">{service.cpu_percent}%</p>
+            <p className="text-slate-200 font-medium">{service.cpu_percent === null ? 'Not measured' : `${service.cpu_percent}%`}</p>
           </div>
           <div>
             <span className="text-slate-400 text-[10px]">P95:</span>
-            <p className="text-slate-200 font-medium">{service.latency_p95}ms</p>
+            <p className="text-slate-200 font-medium">{service.latency_p95 === null ? 'Not measured' : `${service.latency_p95}ms`}</p>
           </div>
-        </div>
-
-        {/* Mini Pod Replica Dots */}
-        <div className="mt-2.5 pt-2 border-t border-border/50 flex items-center gap-1">
-          {Array.from({ length: service.replicas }).map((_, i) => (
-            <span
-              key={i}
-              className={`w-2 h-2 rounded-sm ${
-                isCritical && i === 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500/80'
-              }`}
-              title={`Pod replica #${i + 1}`}
-            />
-          ))}
         </div>
       </div>
     );
@@ -84,33 +66,30 @@ export const InfrastructureDiagram2D: React.FC<Diagram2DProps> = ({ onSelectServ
 
   return (
     <div className="w-full rounded-xl bg-surface-300/40 border border-border p-6 flex flex-col items-center space-y-6">
-      {/* Tier 1: External Client & Cloud Ingress */}
       <div className="w-full max-w-md p-3 rounded-xl bg-surface-200/80 border border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Globe className="w-5 h-5 text-cyan-400 animate-spin" style={{ animationDuration: '20s' }} />
+          <Globe className="w-5 h-5 text-cyan-400" />
           <div>
-            <h3 className="text-xs font-semibold text-slate-200">Global User Traffic / CDN</h3>
-            <p className="text-[11px] text-slate-400 font-mono">Anycast Ingress • Edge SSL Termination</p>
+            <h3 className="text-xs font-semibold text-slate-200">External ingress</h3>
+            <p className="text-[11px] text-slate-400 font-mono">External traffic source is not instrumented</p>
           </div>
         </div>
         <span className="text-xs font-mono text-cyan-400">
-          {simulator?.is_running ? 'Simulation Stream' : 'Live Gateway'}
+          {simulator?.is_running ? 'Local test traffic active' : 'Not connected'}
         </span>
       </div>
 
       <ArrowDown className="w-4 h-4 text-cyan-500/60 animate-bounce" />
 
-      {/* Tier 2: API Gateway Layer */}
       <div className="w-full max-w-lg">
         {renderServiceCard(getService('api-gateway'))}
       </div>
 
       <ArrowDown className="w-4 h-4 text-cyan-500/60" />
 
-      {/* Tier 3: Core Microservices Layer */}
       <div className="w-full">
         <div className="text-center text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-3">
-          Application Microservices Tier (Kubernetes Pods)
+          Catalogued application services
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {renderServiceCard(getService('auth-service'))}
@@ -122,10 +101,9 @@ export const InfrastructureDiagram2D: React.FC<Diagram2DProps> = ({ onSelectServ
 
       <ArrowDown className="w-4 h-4 text-cyan-500/60" />
 
-      {/* Tier 4: Data & Cache Persistence Layer */}
       <div className="w-full max-w-2xl">
         <div className="text-center text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-3">
-          Distributed Persistence & In-Memory Caching
+          Catalogued data dependencies
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {renderServiceCard(getService('postgres-db'))}

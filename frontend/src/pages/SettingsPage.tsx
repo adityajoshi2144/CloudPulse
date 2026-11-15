@@ -1,116 +1,85 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Settings, Save, Server, Shield, Database, Radio, CheckCircle2 } from 'lucide-react';
+import { api } from '../services/api';
+import { Settings, Activity, AlertCircle, ArrowRight } from 'lucide-react';
+
+interface RuntimeHealth {
+  environment: string;
+  checks: {
+    prometheus: { status: string };
+    orchestration: { status: string };
+    database: { status: string };
+    cache: { status: string };
+  };
+}
 
 export const SettingsPage: React.FC = () => {
-  const { environment, setEnvironment, addToast } = useApp();
-  const [prometheusUrl, setPrometheusUrl] = useState('http://localhost:9090');
-  const [grafanaUrl, setGrafanaUrl] = useState('http://localhost:3000');
-  const [scaleUpCooldown, setScaleUpCooldown] = useState(15);
-  const [scaleDownCooldown, setScaleDownCooldown] = useState(30);
+  const { setActiveTab, addToast } = useApp();
+  const [runtime, setRuntime] = useState<RuntimeHealth | null>(null);
 
-  const handleSave = () => {
-    addToast('Cluster configuration saved', 'success');
-  };
+  useEffect(() => {
+    api.getHealth()
+      .then(setRuntime)
+      .catch((error: Error) => addToast(error.message, 'error'));
+  }, []);
+
+  const integrations = [
+    { name: 'Database', status: runtime?.checks.database.status },
+    { name: 'Cache', status: runtime?.checks.cache.status },
+    { name: 'Prometheus', status: runtime?.checks.prometheus.status },
+    { name: 'Kubernetes', status: runtime?.checks.orchestration.status },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="p-4 rounded-xl bg-surface-100/90 border border-border flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-surface-200 text-cyan-400 border border-border">
-            <Settings className="w-5 h-5 text-cyan-400" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100">
-              Platform Configuration & Environment Topology
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Kubernetes HPA parameters, observability scrape targets, and persistence settings.
-            </p>
-          </div>
+      <div className="flex items-start gap-3 rounded-xl border border-border bg-surface-100/90 p-4">
+        <div className="rounded-lg border border-border bg-surface-200 p-2.5 text-cyan-400">
+          <Settings className="h-5 w-5" />
         </div>
-
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium flex items-center gap-2 shadow-glow-cyan transition-all"
-        >
-          <Save className="w-3.5 h-3.5" /> Save Changes
-        </button>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-100">Runtime Configuration</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            This local demo is read-only here. Integration URLs and infrastructure settings are supplied by the backend environment; this page does not apply or persist changes.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Kubernetes & HPA Settings */}
-        <div className="p-5 rounded-xl bg-surface-100/80 border border-border space-y-4">
-          <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
-            <Server className="w-4 h-4 text-cyan-400" /> Auto-Scaling & Cooldown Policies
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="text-slate-400 text-[11px] font-mono block mb-1">
-                Scale-Up Cooldown Window (Seconds)
-              </label>
-              <input
-                type="number"
-                value={scaleUpCooldown}
-                onChange={(e) => setScaleUpCooldown(parseInt(e.target.value) || 15)}
-                className="w-full px-3 py-1.5 rounded bg-surface-200 border border-border text-slate-200 font-mono text-xs focus:outline-none"
-              />
-              <span className="text-[10px] text-slate-400">
-                Minimum delay before triggering another scale-out after a spike.
-              </span>
-            </div>
-
-            <div>
-              <label className="text-slate-400 text-[11px] font-mono block mb-1">
-                Scale-Down Stabilization Window (Seconds)
-              </label>
-              <input
-                type="number"
-                value={scaleDownCooldown}
-                onChange={(e) => setScaleDownCooldown(parseInt(e.target.value) || 30)}
-                className="w-full px-3 py-1.5 rounded bg-surface-200 border border-border text-slate-200 font-mono text-xs focus:outline-none"
-              />
-              <span className="text-[10px] text-slate-400">
-                Prevents flapping by enforcing a cooldown before deallocating pods.
-              </span>
-            </div>
+      <div className="rounded-xl border border-border bg-surface-100/80 p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-cyan-400" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200">Active runtime</h3>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-border bg-surface-200/50 p-3">
+            <span className="text-[10px] uppercase text-slate-400">Environment</span>
+            <p className="mt-1 text-sm font-medium capitalize text-slate-100">{runtime?.environment ?? 'Loading…'}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-surface-200/50 p-3">
+            <span className="text-[10px] uppercase text-slate-400">Scaling</span>
+            <p className="mt-1 text-sm font-medium text-slate-100">Policy-only; no orchestrator adapter</p>
           </div>
         </div>
+      </div>
 
-        {/* Telemetry & Scrape Endpoints */}
-        <div className="p-5 rounded-xl bg-surface-100/80 border border-border space-y-4">
-          <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
-            <Radio className="w-4 h-4 text-emerald-400" /> Observability Integrations
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="text-slate-400 text-[11px] font-mono block mb-1">
-                Prometheus Scrape Endpoint
-              </label>
-              <input
-                type="text"
-                value={prometheusUrl}
-                onChange={(e) => setPrometheusUrl(e.target.value)}
-                className="w-full px-3 py-1.5 rounded bg-surface-200 border border-border text-slate-200 font-mono text-xs focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-slate-400 text-[11px] font-mono block mb-1">
-                Grafana Cloud Instance URL
-              </label>
-              <input
-                type="text"
-                value={grafanaUrl}
-                onChange={(e) => setGrafanaUrl(e.target.value)}
-                className="w-full px-3 py-1.5 rounded bg-surface-200 border border-border text-slate-200 font-mono text-xs focus:outline-none"
-              />
-            </div>
-          </div>
+      <div className="rounded-xl border border-border bg-surface-100/80 p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-amber-400" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200">Integration status</h3>
         </div>
+        <div className="divide-y divide-border/60">
+          {integrations.map((integration) => (
+            <div key={integration.name} className="flex items-center justify-between py-3 text-xs">
+              <span className="text-slate-300">{integration.name}</span>
+              <span className="font-mono text-slate-400">{integration.status ?? 'Checking…'}</span>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={() => setActiveTab('health')}
+          className="mt-4 flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-2 text-xs font-medium text-cyan-300 transition-colors hover:bg-cyan-600/30"
+        >
+          Open System Health <ArrowRight className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );

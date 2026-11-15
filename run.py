@@ -61,7 +61,7 @@ def start_backend():
 
 def main():
     print("=" * 70)
-    print("⚡ CLOUDPULSE — CLOUD OPERATIONS & AUTONOMOUS AUTO-SCALING PLATFORM")
+    print("CLOUDPULSE - CLOUD OPERATIONS & AUTONOMOUS AUTO-SCALING PLATFORM")
     print("=" * 70)
 
     # 1. Start Backend API

@@ -10,12 +10,19 @@ async def list_experiments():
 
 @router.post("/run")
 async def run_experiment(req: ExperimentRunRequest):
-    exp = await experiment_runner.run_benchmark(
-        name=req.name,
-        duration=req.test_duration_seconds,
-        vusers=req.virtual_users
-    )
-    return exp
+    try:
+        return await experiment_runner.run_benchmark(
+            name=req.name,
+            duration=req.test_duration_seconds,
+            vusers=req.virtual_users,
+            pattern=req.pattern,
+            intensity=req.intensity,
+            max_requests=req.max_requests,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 @router.get("/{experiment_id}")
 async def get_experiment(experiment_id: str):

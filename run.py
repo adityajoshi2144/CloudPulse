@@ -1,6 +1,6 @@
 """
-CloudPulse - Unified Cloud Operations & Intelligent Auto-Scaling Platform Launcher
-==================================================================================
+CloudPulse - Unified Cloud Operations & Website Traffic Protection Platform Launcher
+====================================================================================
 One-click orchestrator that boots:
 1. Python FastAPI Backend Engine on http://127.0.0.1:8001
 2. React 19 + TypeScript + Vite Frontend on http://127.0.0.1:5174
@@ -41,7 +41,7 @@ def start_backend():
     print("[*] Starting CloudPulse FastAPI backend on http://127.0.0.1:8001 ...")
     creationflags = 0
     if sys.platform == "win32":
-        creationflags = subprocess.CREATE_NO_WINDOW | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
 
     cmd = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8001"]
     proc = subprocess.Popen(
@@ -50,19 +50,20 @@ def start_backend():
         creationflags=creationflags,
     )
 
-    for _ in range(12):
+    for _ in range(16):
         if is_port_open(8001):
             print("[+] CloudPulse Backend API initialized successfully.")
             return proc
         time.sleep(0.5)
 
+    print("[!] Warning: Port 8001 took longer than expected to report ready.")
     return proc
 
 
 def main():
-    print("=" * 70)
-    print("CLOUDPULSE - CLOUD OPERATIONS & AUTONOMOUS AUTO-SCALING PLATFORM")
-    print("=" * 70)
+    print("=" * 72)
+    print("⚡ CLOUDPULSE — WEBSITE TRAFFIC PROTECTION & CLOUD OPERATIONS PLATFORM")
+    print("=" * 72)
 
     # 1. Start Backend API
     backend_proc = start_backend()
@@ -77,19 +78,31 @@ def main():
     npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
     cmd = [npm_cmd, "run", "dev", "--", "--host", "127.0.0.1", "--port", "5174"]
 
-    def open_browser_later():
-        time.sleep(2.0)
+    def open_browser_when_ready():
+        for _ in range(24):
+            if is_port_open(5174):
+                time.sleep(0.5)
+                print("[+] CloudPulse UI is live! Opening browser at http://127.0.0.1:5174 ...")
+                webbrowser.open("http://127.0.0.1:5174")
+                return
+            time.sleep(0.5)
+        # Fallback open
         webbrowser.open("http://127.0.0.1:5174")
 
     import threading
-    threading.Thread(target=open_browser_later, daemon=True).start()
+    threading.Thread(target=open_browser_when_ready, daemon=True).start()
 
     try:
         subprocess.run(cmd, cwd=str(FRONTEND_DIR), shell=(sys.platform == "win32"))
     except KeyboardInterrupt:
         print("\n[*] Shutting down CloudPulse. Goodbye!")
+    finally:
+        if backend_proc and backend_proc.poll() is None:
+            try:
+                backend_proc.terminate()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
     main()
-

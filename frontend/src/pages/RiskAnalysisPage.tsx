@@ -168,16 +168,23 @@ export const RiskAnalysisPage: React.FC = () => {
         <>
           <section className="grid gap-4 lg:grid-cols-[minmax(240px,.8fr)_2fr]">
             <div className="rounded-xl border border-border bg-surface-100 p-5">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Overall measured risk</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Overall Security Risk</p>
               <div className="mt-3 flex items-end gap-3">
                 <span className="text-5xl font-semibold tabular-nums text-slate-100">
                   {analysis.score === null ? '—' : Math.round(analysis.score)}
                 </span>
                 <span className="pb-1 text-sm text-slate-500">/ 100</span>
               </div>
-              <span className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-medium capitalize ${riskTone[analysis.classification]}`}>
-                {analysis.classification}
-              </span>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase font-mono ${riskTone[analysis.classification]}`}>
+                  {analysis.risk_level || analysis.classification}
+                </span>
+                {analysis.traffic_classification && (
+                  <span className="inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-mono text-cyan-300">
+                    {analysis.traffic_classification}
+                  </span>
+                )}
+              </div>
               <p className="mt-4 text-xs leading-relaxed text-slate-400">
                 {analysis.coverage.available_factors} of {analysis.coverage.total_factors} factors measurable
               </p>

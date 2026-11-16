@@ -15,7 +15,11 @@ import {
   SimulatorLimits,
   RiskAnalysis,
   RiskConfiguration,
-  SimulationReport
+  SimulationReport,
+  SecurityVerdict,
+  FacultyDemoStatus,
+  FacultyDemoReport,
+  ShieldStatus
 } from './types';
 
 const API_BASE = '/api';
@@ -125,4 +129,19 @@ export const api = {
   // Audit & SLO
   getAuditLogs: () => request<AuditLogItem[]>('/audit'),
   getSLOs: () => request<{ slos: SLOItem[] }>('/slo'),
+
+  // Faculty Demonstration Engine
+  getDemoStatus: () => request<FacultyDemoStatus>('/demo/status'),
+  startFacultyDemo: () => request<FacultyDemoStatus>('/demo/start', { method: 'POST' }),
+  pauseFacultyDemo: () => request<FacultyDemoStatus>('/demo/pause', { method: 'POST' }),
+  resumeFacultyDemo: () => request<FacultyDemoStatus>('/demo/resume', { method: 'POST' }),
+  stopFacultyDemo: () => request<FacultyDemoStatus>('/demo/stop', { method: 'POST' }),
+  resetFacultyDemo: () => request<FacultyDemoStatus>('/demo/reset', { method: 'POST' }),
+  getFacultyDemoReport: () => request<FacultyDemoReport>('/demo/report'),
+
+  // Security Verdict & Shield
+  getSecurityVerdict: () => request<SecurityVerdict>('/risk/verdict'),
+  getShieldStatus: () => request<ShieldStatus>('/shield/status'),
+  toggleShieldEnforcement: (enable: boolean) =>
+    request<ShieldStatus>(`/shield/toggle-enforcement?enable=${enable}`, { method: 'POST' }),
 };

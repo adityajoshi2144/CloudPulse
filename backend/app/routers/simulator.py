@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.models.entities import SimulatorConfig
 from app.services.simulator_engine import simulator_engine
+from app.services.shield_service import shield_service
 
 router = APIRouter(prefix="/simulator", tags=["TrafficSimulator"])
 
@@ -47,4 +48,7 @@ async def local_test_target():
             status_code=503,
             detail="The isolated CloudPulse test endpoint is in failure simulation mode.",
         )
+    is_allowed, reason = shield_service.check_request(client_ip="127.0.0.1", path="/api/simulator/test-target")
+    if not is_allowed:
+        raise HTTPException(status_code=429, detail=reason)
     return {"status": "ok", "target": "cloudpulse-test-service"}

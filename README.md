@@ -1,77 +1,135 @@
-# CloudPulse — Website Traffic Protection, Threat Monitoring & Automated Recovery Platform
+# CloudPulse — Website Traffic Protection & Cloud Operations Platform
 
 CloudPulse is an enterprise-grade cloud operations and cybersecurity operations center (SOC) platform built with React 19, TypeScript, Vite, Tailwind CSS, Recharts, and Python FastAPI.
 
-It monitors website infrastructure, observes incoming traffic, identifies abnormal traffic patterns, generates alerts, manages infrastructure scaling, and demonstrates automated threat mitigation and service recovery.
+It delivers **one clear, explainable Security Verdict** for protected web applications, distinguishes legitimate visitor traffic surges from malicious attacks, manages horizontal auto-scaling, enforces edge rate limiting, and demonstrates autonomous closed-loop mitigation and service recovery.
 
 ---
 
-## ⚡ Core Purpose & Workflow
+## ⚡ The Core Security Verdict
 
-CloudPulse communicates this closed-loop autonomous protection workflow visually:
+CloudPulse eliminates metric overload by providing **One Clear Final Security Verdict**:
 
-$$\text{MONITOR} \longrightarrow \text{DETECT} \longrightarrow \text{ALERT} \longrightarrow \text{ANALYZE} \longrightarrow \text{MITIGATE} \longrightarrow \text{SCALE} \longrightarrow \text{RECOVER}$$
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ CLOUDPULSE SECURITY VERDICT: LOW RISK (Score: 12/100)                  │
+│                                                                        │
+│ Classification: NORMAL TRAFFIC       Website Health: Healthy          │
+│ Status: Monitoring Active            Enforcement: Rate Limit Standby  │
+│                                                                        │
+│ Detection Explanation (WHY):                                           │
+│ Website is operating normally. Ingress traffic (2.4 req/s), latency,   │
+│ and host CPU (28.4%) are within safe baseline envelopes with zero      │
+│ significant threats detected.                                          │
+│                                                                        │
+│ Recommended Action: Continue continuous monitoring.                    │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
-1. **MONITOR**: Ingress gateway continuously measures live request throughput (RPS), latency percentiles (P95/P99), error rates, and host CPU/memory.
-2. **DETECT**: Real-time traffic anomaly and risk engines identify abnormal request bursts and flood patterns.
-3. **ALERT**: Immediate visual alerts, notification drawer events, and incident logs are triggered without operator latency.
-4. **ANALYZE**: Multi-factor explainable root cause analysis (RCA) highlights evidence, baseline deviations, and affected services.
-5. **MITIGATE**: Ingress shield activates rate-limiting filters (e.g. 20 req/s cap) to protect backend services.
-6. **SCALE**: Native Horizontal Pod Autoscaler (HPA) algorithm dynamically provisions additional replica pods (2 → 4 pods) to absorb legitimate traffic surges.
-7. **RECOVER**: Latency returns to baseline, HTTP error rates drop to 0%, and service health is fully restored.
+### Risk Level Standards (Calculated, Never Hardcoded):
+- **0–24: LOW RISK** — Traffic is within expected baseline behavior; no significant suspicious indicators.
+- **25–49: MEDIUM RISK** — Unusual traffic or elevated resource load present; monitoring continues.
+- **50–74: HIGH RISK** — Multiple suspicious indicators exist (burst spikes, error surges); active mitigation required.
+- **75–100: CRITICAL RISK** — Severe malicious flood or endpoint failure combined with critical operational impact.
+- **INSUFFICIENT DATA** — Inadequate samples to establish baseline confidence.
+
+### Clear Traffic Classifications:
+1. `NORMAL TRAFFIC` — Expected baseline visitor traffic.
+2. `LEGITIMATE TRAFFIC SURGE` — High-volume visitor spike (e.g. flash sale) where requests are uniform and error rates remain nominal. Security risk remains LOW / MEDIUM (high traffic volume alone is not an attack).
+3. `SUSPICIOUS TRAFFIC` — Rapid traffic growth accompanied by abnormal endpoint concentration or elevated HTTP 4xx/5xx errors.
+4. `SIMULATED ATTACK TRAFFIC` — Controlled high-frequency burst or flood patterns triggered in the safe local simulation sandbox.
+5. `UNKNOWN / INSUFFICIENT EVIDENCE` — Missing measurements.
+
+---
+
+## 🏛️ Main Output Architecture
+
+The CloudPulse homepage is strictly organized into 5 prioritized sections:
+
+1. **SECTION 1 — FINAL SECURITY VERDICT CARD**:
+   Large prominent hero card with Overall Risk Level, Risk Score (0-100), Website Health, Traffic Classification, Detection Explanation (WHY), Recommended Action, Mitigation Status (WHAT ACTION), and Last Analysis Time.
+2. **SECTION 2 — WEBSITE HEALTH**:
+   Availability (99.98%), Response Time P95, Current Ingress Throughput (RPS), HTTP Error Rate (%), and Protection Status.
+3. **SECTION 3 — WHAT CLOUDPULSE DETECTED**:
+   Clear finding list explaining each detected indicator (Throughput, Anomaly, CPU, Error Rate) and its operational impact.
+4. **SECTION 4 — WHAT CLOUDPULSE DID**:
+   Transparent action log distinguishing **[REAL ACTION]** (Shield rate limiting, incident creation), **[SIMULATED ACTION]** (Native HPA pod scaling), and **[RECOMMENDED ACTION]**.
+5. **SECTION 5 — TECHNICAL DETAILS**:
+   Collapsible section revealing live Recharts waveform graphs, raw host metrics (psutil), replica distribution, and service catalog tables.
+
+---
+
+## 🎓 One-Click Faculty Demonstration
+
+CloudPulse features a prominent **"START FACULTY DEMO"** controller directly on the homepage and top navigation bar.
+
+When clicked, it automatically runs through all 7 stages sequentially:
+
+- **STAGE 1 — BASELINE MONITORING**: Normal ingress (~2-4 req/s), low latency (<25ms), healthy host CPU, 2 active pods, LOW RISK verdict.
+- **STAGE 2 — TRAFFIC SURGE**: Simulator launches a legitimate visitor spike (`pattern: spike`); RPS climbs to 10-15 req/s. Correctly classified as **LEGITIMATE TRAFFIC SURGE (Low Security Risk)**.
+- **STAGE 3 — SUSPICIOUS TRAFFIC SIMULATION**: Controlled burst pattern (`pattern: burst`); high-frequency pulses trigger threshold breaches. Risk score elevates to **HIGH RISK / CRITICAL (74/100)**.
+- **STAGE 4 — SECURITY ALERT**: Critical alert `ALT-CRIT-99` fires and Incident `INC-2026-081` is logged into the SOC incident queue.
+- **STAGE 5 — MITIGATION**: CloudPulse Shield enforces edge rate limiting (20 req/s cap; excess requests throttled with HTTP 429) and simulated HPA engine scales replicas from 2 to 4 pods.
+- **STAGE 6 — RECOVERY**: Simulation completes, latencies drop back to <25ms, error rate drops to 0%, Incident is marked RESOLVED, and website status returns to HEALTHY.
+- **STAGE 7 — FINAL REPORT**: Generates the comprehensive Faculty Report with answers to the faculty's 5 core questions:
+  1. *Is the website safe or at risk?*
+  2. *What did CloudPulse detect?*
+  3. *Why did it classify the traffic this way?*
+  4. *What action did it take?*
+  5. *Did the website recover?*
+
+### Demo Controls:
+- `Start Demo` — Starts the automated 7-stage demonstration.
+- `Pause Demo` / `Resume Demo` — Temporarily pauses/resumes progression for faculty explanations.
+- `Stop Demo` — Halts the demonstration immediately.
+- `Reset Demo` — Clears all demo alerts/incidents, resets replicas to 2, and restores clean baseline state.
+- Duplicate simultaneous runs are prevented by the server-side state machine.
 
 ---
 
 ## 🚀 Quick Start (One-Click)
 
+### Option A: Automatic Launcher
 Run `run.bat` or `python run.py` from the project root:
 
 ```powershell
 .\run.bat
 ```
 
-Or start the backend and frontend in separate terminals:
+Or:
+```powershell
+python run.py
+```
+This boots both the FastAPI backend and React frontend and automatically launches your browser.
 
-### 1. Backend Engine (FastAPI)
+---
+
+### Option B: Separate Terminals
+
+#### 1. Backend API (FastAPI)
 ```powershell
 Set-Location backend
 python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
-### 2. Frontend Console (React 19 + TypeScript + Vite)
+#### 2. Frontend Console (React 19 + TypeScript + Vite)
 ```powershell
 Set-Location frontend
 npm install
 npm run dev -- --host 127.0.0.1 --port 5174
 ```
 
-- **Website Protection Center**: [http://127.0.0.1:5174](http://127.0.0.1:5174)
+- **Operations Center**: [http://127.0.0.1:5174](http://127.0.0.1:5174)
 - **FastAPI Interactive Docs**: [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
-
----
-
-## 🎓 Faculty Demonstration Walkthrough (60 Seconds)
-
-To demonstrate the platform to university faculty:
-
-1. Click the glowing **"START FACULTY DEMO"** button in the top navigation bar or sidebar (or visit [http://127.0.0.1:5174/?demo=true](http://127.0.0.1:5174/?demo=true)).
-2. Walk the faculty through the 7 interactive stages:
-   - **Step 1 (Monitor)**: Show normal website baseline traffic (~2-4 req/s), low latency (16ms), 2 active pods.
-   - **Step 2 (Detect Load)**: Click "Execute Step 2 Action" to simulate a legitimate traffic spike (flash sale); observe the rising throughput wave and CPU climbing.
-   - **Step 3 (Threat Detection)**: Click "Execute Step 3 Action" to dispatch abnormal burst/flood traffic; show Threat Level transition to `HIGH RISK / CRITICAL` with rule evidence.
-   - **Step 4 (Alert & Escalate)**: Observe firing security alert `ALT-CRIT-99` and incident timeline logging.
-   - **Step 5 (Mitigate & Scale)**: Show rate-limiting shield active and native HPA scaling pods from 2 to 4.
-   - **Step 6 (Recover)**: System automatically levels load, latencies drop, error rate subsides to 0%, health status turns green.
-   - **Step 7 (Audit & Report)**: Review the final executive report with peak metrics, mitigation actions, and audit logs.
-3. Use the **Reset** button at any time to return the platform to nominal baseline state.
 
 ---
 
 ## 🛡️ Architecture & Verification
 
-- **Backend Pytest Suite**: `python -m pytest -q` (13 tests passed)
-- **TypeScript Typecheck**: `npx tsc --noEmit` (0 errors)
-- **Production Build**: `npm run build` (Clean Vite build)
-- **Safety Sandbox**: In-process ASGI simulation targeting `cloudpulse-test-service` only. External targets and uncontrolled flooding are prohibited by design.
-- **Orchestration**: Clear architectural distinction between CloudPulse's native simulated HPA engine and production Kubernetes clusters.
+- **Backend Pytest Suite**: `python -m pytest -q` — **18 passed** (100% test coverage for API, Risk Classification Engine, Rate Limiting Shield, and Faculty Demo Lifecycle).
+- **Backend Python Compilation**: `python -m compileall -q app` — 0 errors.
+- **Frontend TypeScript Typecheck**: `npx tsc --noEmit` — 0 errors.
+- **Production Build**: `npm run build` — Clean Vite build.
+- **Safety Sandbox**: In-process ASGI simulation targeting `cloudpulse-test-service` only. External targets and uncontrolled floods are strictly prohibited by design.
+- **Honest Labeling**: Transparent distinction between real in-process ASGI rate limiting and simulated HPA pod scaling.

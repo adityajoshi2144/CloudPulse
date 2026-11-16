@@ -179,6 +179,141 @@ export interface RiskAnalysis {
   metrics_source: string;
   metrics_scope: string;
   configuration: RiskConfiguration;
+
+  // Master Refinement fields
+  risk_score?: number | null;
+  risk_level?: RiskLevel;
+  traffic_classification?: TrafficClassification;
+  website_health?: 'Healthy' | 'Degraded' | 'Critical' | 'Insufficient Data';
+  security_status?: string;
+  confidence_or_evidence_quality?: string;
+  detected_indicators?: DetectedIndicator[];
+  mitigation_status?: string;
+  simulation_mode?: boolean;
+  assessed_at?: string;
+  last_analysis_time?: string;
+}
+
+export type RiskLevel = 'LOW RISK' | 'MEDIUM RISK' | 'HIGH RISK' | 'CRITICAL RISK' | 'INSUFFICIENT DATA';
+
+export type TrafficClassification =
+  | 'NORMAL TRAFFIC'
+  | 'LEGITIMATE TRAFFIC SURGE'
+  | 'SUSPICIOUS TRAFFIC'
+  | 'SIMULATED ATTACK TRAFFIC'
+  | 'UNKNOWN / INSUFFICIENT EVIDENCE';
+
+export interface DetectedIndicator {
+  name: string;
+  value: string;
+  status: 'nominal' | 'surge' | 'warning' | 'threat' | 'critical';
+  severity: 'nominal' | 'info' | 'warning' | 'critical';
+  impact: string;
+  evidence?: string;
+}
+
+export interface SecurityVerdict {
+  risk_level: RiskLevel;
+  risk_score: number | null;
+  traffic_classification: TrafficClassification;
+  website_health: 'Healthy' | 'Degraded' | 'Critical' | 'Insufficient Data';
+  security_status: string;
+  confidence: string;
+  detected_indicators: DetectedIndicator[];
+  explanation: string;
+  recommended_action: string;
+  mitigation_status: string;
+  simulation_mode: boolean;
+  assessed_at: string;
+  last_analysis_time: string;
+}
+
+export interface FacultyDemoStatus {
+  is_running: boolean;
+  is_paused: boolean;
+  current_stage: number;
+  total_stages: number;
+  stage_name: string;
+  stage_badge: string;
+  stage_title: string;
+  stage_description: string;
+  stage_elapsed_seconds: number;
+  stage_duration_seconds: number;
+  total_elapsed_seconds: number;
+  total_duration_seconds: number;
+  progress_percent: number;
+  peak_metrics: { rps: number; cpu: number; p95: number };
+  logs: { timestamp: string; stage: string; message: string }[];
+  final_report: FacultyDemoReport | null;
+  has_report: boolean;
+}
+
+export interface FacultyDemoReport {
+  title: string;
+  generated_at: string;
+  target_system: string;
+  simulation_mode: boolean;
+  simulation_mode_label: string;
+  executive_answers: {
+    is_website_safe_or_at_risk: string;
+    what_did_cloudpulse_detect: string;
+    why_did_it_classify_this_way: string;
+    what_action_did_it_take: string;
+    did_the_website_recover: string;
+  };
+  initial_state: {
+    risk_score: number | null;
+    risk_level: string;
+    website_health: string;
+    rps: number;
+    cpu_percent: number;
+  };
+  peak_measurements: {
+    peak_traffic_rps: number;
+    peak_cpu_percent: number;
+    peak_p95_latency_ms: number;
+  };
+  final_state: {
+    risk_score: number | null;
+    risk_level: string;
+    website_health: string;
+    rps: number;
+    recovery_status: string;
+  };
+  alerts_generated: string[];
+  mitigation_actions: {
+    action: string;
+    type: string;
+    detail: string;
+    status: string;
+  }[];
+  scaling_events: any[];
+  overall_verdict: string;
+}
+
+export interface ShieldStatus {
+  shield_enabled: boolean;
+  rate_limiting_enforced: boolean;
+  rate_limit_rps: number;
+  current_window_rps: number;
+  total_evaluated: number;
+  total_allowed: number;
+  total_blocked: number;
+  last_blocked_at: string | null;
+  last_action_time: string;
+  enforcement_mode: string;
+  enforcement_scope: string;
+  recent_actions: any[];
+}
+
+export interface PlatformNotification {
+  id: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'RECOVERY';
+  time: string;
+  reason: string;
+  affected_service: string;
+  current_action: string;
+  incident_link?: string;
 }
 
 export interface RiskConfiguration {

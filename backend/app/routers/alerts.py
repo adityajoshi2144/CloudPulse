@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 from app.models.entities import AlertThresholdConfig
 from app.core.telemetry_state import telemetry_state
+from app.services.demo_engine import demo_engine
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -44,9 +45,22 @@ alert_thresholds = [
 
 @router.get("")
 async def get_alerts():
-    # Dynamically inject critical alert if chaos is active
+    # Dynamically inject critical alert if chaos is active or demo stage is alert/mitigation
     dynamic_list = list(active_alerts)
-    if telemetry_state.failing_service_id:
+    if demo_engine.alerts_generated and demo_engine.current_stage in (4, 5):
+        dynamic_list.insert(0, {
+            "id": "ALT-CRIT-99",
+            "service_id": "api-gateway",
+            "service_name": "API Gateway Ingress",
+            "metric": "HTTP Request Rate / Anomaly",
+            "threshold": 15.0,
+            "current_value": 24.5,
+            "severity": "critical",
+            "status": "firing",
+            "triggered_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "message": "Critical burst flood detected violating ingress rate limit (20 req/s cap)"
+        })
+    elif telemetry_state.failing_service_id:
         s_id = telemetry_state.failing_service_id
         svc = telemetry_state.services.get(s_id, {})
         dynamic_list.insert(0, {

@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.metrics_collector import metrics_collector
+from app.core.telemetry_state import telemetry_state
+from app.services.shield_service import shield_service
+from app.services.autoscaler import autoscaler_service
 
 
 _DEFAULT_WEIGHTS = {
@@ -117,14 +120,15 @@ class RiskEngine:
                 return None
             return round(sum(item["normalized_score"] * weight for item, weight in included) / weight_sum, 1)
 
-        overall = weighted_score(list(_DEFAULT_WEIGHTS))
+        raw_overall = weighted_score(list(_DEFAULT_WEIGHTS))
         overload = weighted_score([
             "p95_latency", "cpu_utilization", "memory_utilization",
             "queue_depth", "pod_health", "pod_restart_frequency", "autoscaling_delay",
         ])
         traffic = weighted_score(["request_rate_anomaly", "traffic_anomaly_score"])
         availability = weighted_score(["http_error_rate", "pod_health"])
-        classification = self._classify(overall)
+
+        # Rank contributing factors
         ranked = sorted(
             (
                 factor for factor in factors
@@ -134,9 +138,146 @@ class RiskEngine:
             reverse=True,
         )
         contributors = ranked[:3]
-        explanation = self._explanation(classification, contributors, overall)
+
+        # -------------------------------------------------------------
+        # CLASSIFY TRAFFIC & DEDUCE CAUSE (Rules from Section 3 & 4)
+        # -------------------------------------------------------------
+        current_rps = snapshot.get("requests_per_second") or 0.0
+        error_rate = snapshot.get("error_rate_percent") or 0.0
+        cpu_percent = snapshot.get("cpu_utilization_percent") or 0.0
+        p95_ms = snapshot.get("p95_latency_ms") or 0.0
+        total_requests = snapshot.get("total_requests") or 0
+        is_simulation = getattr(telemetry_state, "simulator_active", False)
+        sim_pattern = getattr(telemetry_state, "simulator_pattern", "idle")
+
+        historical_rates = [
+            point["requests_per_second"]
+            for point in history
+            if point.get("requests_per_second") is not None
+        ]
+        baseline_rate = (
+            round(sum(historical_rates[:-5] or historical_rates[:-1]) / len(historical_rates[:-5] or historical_rates[:-1]), 2)
+            if len(historical_rates) >= 2
+            else 2.0
+        )
+
+        traffic_classification, security_status, is_attack = self._classify_traffic(
+            is_simulation=is_simulation,
+            sim_pattern=sim_pattern,
+            current_rps=current_rps,
+            baseline_rps=baseline_rate,
+            error_rate=error_rate,
+            total_requests=total_requests,
+        )
+
+        # -------------------------------------------------------------
+        # CALIBRATE RISK SCORE ACCORDING TO CLASSIFICATION RULES
+        # - High traffic alone != attack
+        # - High CPU alone != attack
+        # - Single failed request != critical attack
+        # - Legitimate visitor surge separated from malicious traffic
+        # -------------------------------------------------------------
+        if total_requests == 0 and not is_simulation:
+            risk_score = raw_overall
+            risk_level = "LOW RISK" if raw_overall is not None and raw_overall <= 24 else "INSUFFICIENT DATA"
+            confidence = "Low" if total_requests == 0 else "High"
+        elif traffic_classification == "LEGITIMATE TRAFFIC SURGE":
+            # Cap security threat score: workload increases CPU, but security risk stays LOW or MEDIUM
+            # strictly < 50
+            infra_load_score = min(40.0, (cpu_percent / 100.0) * 35.0 + (p95_ms / 500.0) * 10.0)
+            risk_score = round(max(10.0, infra_load_score), 1)
+            risk_level = "LOW RISK" if risk_score < 25 else "MEDIUM RISK"
+            confidence = "High"
+        elif traffic_classification in ("SIMULATED ATTACK TRAFFIC", "SUSPICIOUS TRAFFIC"):
+            # Elevate risk to High or Critical
+            if sim_pattern in ("flood", "failure") or error_rate >= 5.0 or (cpu_percent >= 90 and current_rps >= 15):
+                risk_score = round(max(75.0, raw_overall if raw_overall else 78.0), 1)
+                risk_level = "CRITICAL RISK"
+            else:
+                risk_score = round(max(58.0, min(74.0, raw_overall if raw_overall else 68.0)), 1)
+                risk_level = "HIGH RISK"
+            confidence = "High (Controlled Simulation)" if is_simulation else "High"
+        else:
+            # Normal Traffic
+            if raw_overall is None:
+                risk_score = 12.0
+                risk_level = "LOW RISK"
+            else:
+                risk_score = raw_overall
+                risk_level = (
+                    "CRITICAL RISK" if risk_score >= 75
+                    else "HIGH RISK" if risk_score >= 50
+                    else "MEDIUM RISK" if risk_score >= 25
+                    else "LOW RISK"
+                )
+            confidence = "High"
+
+        # Classification string for backwards compatibility (tests check "low", "moderate", "high", "critical")
+        if risk_level == "LOW RISK":
+            classification = "low"
+        elif risk_level == "MEDIUM RISK":
+            classification = "moderate"
+        elif risk_level == "HIGH RISK":
+            classification = "high"
+        elif risk_level == "CRITICAL RISK":
+            classification = "critical"
+        else:
+            classification = "unknown"
+
+        # Website Health
+        if error_rate >= 10.0 or getattr(telemetry_state, "failing_service_id", None):
+            website_health = "Critical"
+        elif error_rate >= 2.0 or cpu_percent >= 85.0 or p95_ms >= 500.0:
+            website_health = "Degraded"
+        elif total_requests > 0:
+            website_health = "Healthy"
+        else:
+            website_health = "Healthy"
+
+        # Detected Indicators
+        detected_indicators = self._build_detected_indicators(
+            traffic_classification=traffic_classification,
+            current_rps=current_rps,
+            baseline_rps=baseline_rate,
+            cpu_percent=cpu_percent,
+            p95_ms=p95_ms,
+            error_rate=error_rate,
+            sim_pattern=sim_pattern,
+            is_simulation=is_simulation,
+        )
+
+        # Mitigation status
+        shield_info = shield_service.get_status()
+        scaling_events = autoscaler_service.get_scaling_events()
+        mitigation_status = self._build_mitigation_status(
+            shield_info=shield_info,
+            scaling_events=scaling_events,
+            risk_level=risk_level,
+            traffic_classification=traffic_classification,
+        )
+
+        # Explain WHY and WHAT ACTION
+        explanation = self._build_verdict_explanation(
+            risk_level=risk_level,
+            risk_score=risk_score,
+            traffic_classification=traffic_classification,
+            current_rps=current_rps,
+            baseline_rps=baseline_rate,
+            cpu_percent=cpu_percent,
+            error_rate=error_rate,
+            is_simulation=is_simulation,
+            sim_pattern=sim_pattern,
+        )
+        recommended_action = self._build_verdict_recommended_action(
+            risk_level=risk_level,
+            traffic_classification=traffic_classification,
+            cpu_percent=cpu_percent,
+            error_rate=error_rate,
+        )
+
         return {
-            "score": overall,
+            # Backward-compatible fields
+            "score": risk_score,
             "classification": classification,
             "risk_by_category": {
                 "infrastructure_overload": overload,
@@ -157,12 +298,232 @@ class RiskEngine:
                 if factor["threshold_status"] in {"warning", "critical"}
             ],
             "explanation": explanation,
-            "recommended_action": self._recommended_action(classification, contributors),
+            "recommended_action": recommended_action,
             "calculated_at": snapshot["timestamp"],
             "metrics_source": snapshot["metrics_source"],
             "metrics_scope": snapshot["metrics_scope"],
             "configuration": self.get_config(),
+
+            # Master Refinement Structured Verdict Fields
+            "risk_score": risk_score,
+            "risk_level": risk_level,
+            "traffic_classification": traffic_classification,
+            "website_health": website_health,
+            "security_status": security_status,
+            "confidence_or_evidence_quality": confidence,
+            "detected_indicators": detected_indicators,
+            "mitigation_status": mitigation_status,
+            "assessed_at": snapshot["timestamp"],
+            "last_analysis_time": snapshot["timestamp"],
+            "simulation_mode": is_simulation,
         }
+
+    def _classify_traffic(
+        self,
+        is_simulation: bool,
+        sim_pattern: str,
+        current_rps: float,
+        baseline_rps: float,
+        error_rate: float,
+        total_requests: int,
+    ) -> tuple[str, str, bool]:
+        """
+        Delineate legitimate traffic surge from malicious attack.
+        Returns (traffic_classification, security_status, is_attack).
+        """
+        if is_simulation:
+            if sim_pattern in ("burst", "flood", "failure"):
+                return "SIMULATED ATTACK TRAFFIC", "Threat Detected", True
+            if sim_pattern in ("spike", "gradual"):
+                return "LEGITIMATE TRAFFIC SURGE", "Elevated Load (Legitimate)", False
+            if sim_pattern == "normal":
+                return "NORMAL TRAFFIC", "Normal", False
+
+        if total_requests == 0:
+            return "NORMAL TRAFFIC", "Normal", False
+
+        # Live non-simulation traffic analysis
+        is_elevated_traffic = current_rps > max(6.0, baseline_rps * 1.8)
+        has_high_errors = error_rate >= 5.0
+
+        if is_elevated_traffic and has_high_errors:
+            return "SUSPICIOUS TRAFFIC", "Elevated Risk", True
+
+        if is_elevated_traffic and not has_high_errors:
+            return "LEGITIMATE TRAFFIC SURGE", "Elevated Load (Legitimate)", False
+
+        return "NORMAL TRAFFIC", "Normal", False
+
+    def _build_detected_indicators(
+        self,
+        traffic_classification: str,
+        current_rps: float,
+        baseline_rps: float,
+        cpu_percent: float,
+        p95_ms: float,
+        error_rate: float,
+        sim_pattern: str,
+        is_simulation: bool,
+    ) -> list[dict[str, Any]]:
+        indicators = []
+
+        # 1. Traffic behavior
+        if traffic_classification == "LEGITIMATE TRAFFIC SURGE":
+            growth = round(((current_rps - baseline_rps) / max(baseline_rps, 1.0)) * 100, 0)
+            indicators.append({
+                "name": "Traffic Volume Surge",
+                "value": f"{current_rps} req/s (+{max(0, int(growth))}%)",
+                "status": "surge",
+                "severity": "info",
+                "impact": "Inbound request rate increased substantially, but error rate remains normal and distribution is uniform.",
+                "evidence": f"Measured {current_rps} req/s vs baseline {baseline_rps} req/s.",
+            })
+        elif traffic_classification == "SIMULATED ATTACK TRAFFIC":
+            indicators.append({
+                "name": "Abnormal Traffic Pattern",
+                "value": f"{sim_pattern.upper()} ({current_rps} req/s)",
+                "status": "threat",
+                "severity": "critical",
+                "impact": "Controlled simulation generated abnormal high-frequency burst pattern exceeding baseline variance bounds.",
+                "evidence": f"Scenario {sim_pattern} active targeting local test route.",
+            })
+        else:
+            indicators.append({
+                "name": "Ingress Throughput",
+                "value": f"{current_rps} req/s",
+                "status": "nominal",
+                "severity": "nominal",
+                "impact": "Traffic is operating within the expected baseline envelope.",
+                "evidence": f"Current throughput {current_rps} req/s conforms to baseline ({baseline_rps} req/s).",
+            })
+
+        # 2. Host CPU
+        if cpu_percent >= 75.0:
+            indicators.append({
+                "name": "Host CPU Utilization",
+                "value": f"{cpu_percent}%",
+                "status": "warning" if cpu_percent < 90.0 else "critical",
+                "severity": "warning" if cpu_percent < 90.0 else "critical",
+                "impact": "Host CPU exceeded warning threshold (70%); scaling policies evaluate replica capacity.",
+                "evidence": f"Measured with psutil: {cpu_percent}% host CPU utilization.",
+            })
+        else:
+            indicators.append({
+                "name": "Host CPU Utilization",
+                "value": f"{cpu_percent}%",
+                "status": "nominal",
+                "severity": "nominal",
+                "impact": "CPU utilization is healthy and within normal operating limits.",
+                "evidence": f"{cpu_percent}% host CPU.",
+            })
+
+        # 3. HTTP Error Rate
+        if error_rate >= 2.0:
+            indicators.append({
+                "name": "HTTP Error Rate",
+                "value": f"{error_rate}%",
+                "status": "warning" if error_rate < 5.0 else "critical",
+                "severity": "warning" if error_rate < 5.0 else "critical",
+                "impact": "Elevated 4xx/5xx responses detected, indicating potential server overload or endpoint rejection.",
+                "evidence": f"{error_rate}% error rate in recent 60-second window.",
+            })
+        else:
+            indicators.append({
+                "name": "HTTP Error Rate",
+                "value": f"{error_rate}%",
+                "status": "nominal",
+                "severity": "nominal",
+                "impact": "HTTP responses are healthy with zero or negligible status failures.",
+                "evidence": "Observed 0% errors across recent requests.",
+            })
+
+        return indicators
+
+    def _build_mitigation_status(
+        self,
+        shield_info: dict[str, Any],
+        scaling_events: list[dict[str, Any]],
+        risk_level: str,
+        traffic_classification: str,
+    ) -> str:
+        rate_enforced = shield_info.get("rate_limiting_enforced", True)
+        rate_cap = shield_info.get("rate_limit_rps", 20)
+        blocked_count = shield_info.get("total_blocked", 0)
+
+        recent_scale = scaling_events[0] if scaling_events else None
+
+        if risk_level in ("HIGH RISK", "CRITICAL RISK"):
+            return (
+                f"Active Defense Engaged: Rate Limiting Enforced ({rate_cap} req/s cap, "
+                f"{blocked_count} requests throttled). HPA scale-out ready."
+            )
+        elif traffic_classification == "LEGITIMATE TRAFFIC SURGE":
+            scale_note = (
+                f"HPA scaled {recent_scale['from_replicas']} → {recent_scale['to_replicas']} pods. "
+                if recent_scale else "HPA capacity monitored. "
+            )
+            return f"{scale_note}Rate limiting filter on standby ({rate_cap} req/s cap)."
+        elif recent_scale and recent_scale.get("to_replicas", 2) > 2:
+            return f"HPA Active ({recent_scale['to_replicas']} pods). Shield rate limiting on standby."
+        else:
+            return f"Monitoring Active. CloudPulse Shield rate limiting filter standby ({rate_cap} req/s cap)."
+
+    def _build_verdict_explanation(
+        self,
+        risk_level: str,
+        risk_score: float | None,
+        traffic_classification: str,
+        current_rps: float,
+        baseline_rps: float,
+        cpu_percent: float,
+        error_rate: float,
+        is_simulation: bool,
+        sim_pattern: str,
+    ) -> str:
+        if risk_level == "INSUFFICIENT DATA":
+            return "Verdict is INSUFFICIENT DATA because insufficient request samples have been observed to establish baseline confidence."
+
+        if traffic_classification == "LEGITIMATE TRAFFIC SURGE":
+            return (
+                f"Website is experiencing a Legitimate Traffic Surge ({current_rps} req/s vs baseline {baseline_rps} req/s). "
+                f"Traffic patterns remain uniform and HTTP error rate is low ({error_rate}%). "
+                f"Classified as LOW/MEDIUM RISK (score {risk_score}/100) because high traffic volume alone does not constitute an attack."
+            )
+
+        if traffic_classification == "SIMULATED ATTACK TRAFFIC":
+            return (
+                f"Controlled simulation detected an abnormal {sim_pattern.upper()} traffic pattern. "
+                f"Rapid burst frequency and elevated variance exceed baseline tolerances. "
+                f"Classified as {risk_level} (score {risk_score}/100) in safe local simulation mode."
+            )
+
+        if traffic_classification == "SUSPICIOUS TRAFFIC":
+            return (
+                f"Suspicious request patterns detected: rapid traffic growth accompanied by elevated error rate ({error_rate}%) "
+                f"and CPU utilization ({cpu_percent}%). Classified as {risk_level} (score {risk_score}/100)."
+            )
+
+        return (
+            f"Website is operating normally. Ingress traffic ({current_rps} req/s), latency, and host CPU ({cpu_percent}%) "
+            f"are within safe baseline thresholds with zero significant threats detected. Risk score is {risk_score}/100 (LOW RISK)."
+        )
+
+    def _build_verdict_recommended_action(
+        self,
+        risk_level: str,
+        traffic_classification: str,
+        cpu_percent: float,
+        error_rate: float,
+    ) -> str:
+        if risk_level == "CRITICAL RISK":
+            return "Enforce immediate rate-limiting on offending endpoints, scale backend worker replicas, and verify database pool health."
+        if risk_level == "HIGH RISK":
+            return "Inspect source distribution, verify rate-limiting shield rules, and prepare horizontal pod auto-scaler for surge absorption."
+        if traffic_classification == "LEGITIMATE TRAFFIC SURGE":
+            return "Allow legitimate visitor traffic to pass. Observe host CPU headroom and allow auto-scaler to adjust replica counts if needed."
+        if risk_level == "MEDIUM RISK":
+            return "Monitor host CPU and latency trends. Confirm alert notification channels are operational."
+        return "Continue continuous monitoring. All website health and traffic indicators are nominal."
 
     def _factors(
         self,
@@ -315,43 +676,6 @@ class RiskEngine:
         if score >= self.classification_thresholds["moderate"]:
             return "moderate"
         return "low"
-
-    @staticmethod
-    def _explanation(
-        classification: str,
-        contributors: list[dict[str, Any]],
-        score: float | None,
-    ) -> str:
-        if score is None:
-            return "Risk is unknown because no configured factors currently have enough measured data."
-        if not contributors or all(item["normalized_score"] == 0 for item in contributors):
-            return f"Risk is {classification} based on currently measured factors; no configured warning thresholds are exceeded."
-        evidence = ", ".join(
-            (
-                f'{item["label"]} measured {item["value"]} {item["unit"]}, '
-                f'{item["threshold_status"]} threshold {item["warning_threshold"]} {item["unit"]}'
-            )
-            for item in contributors
-        )
-        return f"Risk is {classification} (score {score}/100) because {evidence}."
-
-    @staticmethod
-    def _recommended_action(classification: str, contributors: list[dict[str, Any]]) -> str:
-        if classification == "unknown":
-            return "Collect more request samples and configure the missing queue, Kubernetes, and model integrations."
-        if contributors and classification in {"high", "critical"}:
-            return (
-                f"Investigate {contributors[0]['label'].lower()} first. "
-                "Review the measured values and validate service health before changing infrastructure."
-            )
-        if contributors:
-            return (
-                f"Overall risk is {classification}, but {contributors[0]['label'].lower()} "
-                "exceeds its warning threshold. Review the trend and confirm alert thresholds."
-            )
-        if classification == "moderate":
-            return "Review the contributing measurements and confirm alert thresholds; no automatic infrastructure action was taken."
-        return "Continue monitoring. No measured factor currently exceeds its configured warning threshold."
 
 
 risk_engine = RiskEngine()

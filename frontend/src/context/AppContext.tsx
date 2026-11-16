@@ -1,5 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { SystemOverview, ServiceItem, SimulatorStatus, SecurityEvent, ThreatLevel } from '../services/types';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {
+  SystemOverview,
+  ServiceItem,
+  SimulatorStatus,
+  SecurityEvent,
+  ThreatLevel,
+  SecurityVerdict,
+  FacultyDemoStatus,
+  ShieldStatus,
+  PlatformNotification
+} from '../services/types';
 import { api } from '../services/api';
 
 interface Toast {
@@ -16,6 +26,9 @@ interface AppContextType {
   overview: SystemOverview | null;
   services: ServiceItem[];
   simulator: SimulatorStatus | null;
+  securityVerdict: SecurityVerdict | null;
+  demoStatus: FacultyDemoStatus | null;
+  shieldStatus: ShieldStatus | null;
   isInitialLoading: boolean;
   activeAlertsCount: number;
   isCommandPaletteOpen: boolean;
@@ -24,6 +37,8 @@ interface AppContextType {
   setIsNotificationOpen: (open: boolean) => void;
   toasts: Toast[];
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  notifications: PlatformNotification[];
+  addNotification: (notif: Omit<PlatformNotification, 'id' | 'time'>) => void;
   refreshData: () => Promise<void>;
   selectedServiceId: string | null;
   setSelectedServiceId: (id: string | null) => void;
@@ -48,6 +63,13 @@ interface AppContextType {
   setTheme: (theme: 'dark' | 'light') => void;
   toggleTheme: () => void;
   wsConnected: boolean;
+
+  // Faculty Demo Controls
+  startFacultyDemo: () => Promise<void>;
+  pauseFacultyDemo: () => Promise<void>;
+  resumeFacultyDemo: () => Promise<void>;
+  stopFacultyDemo: () => Promise<void>;
+  resetFacultyDemo: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -82,6 +104,17 @@ const INITIAL_SECURITY_EVENTS: SecurityEvent[] = [
   },
 ];
 
+const INITIAL_NOTIFICATIONS: PlatformNotification[] = [
+  {
+    id: 'notif-base',
+    severity: 'LOW',
+    time: 'Just now',
+    reason: 'Website operating normally with healthy baseline traffic.',
+    affected_service: 'api-gateway',
+    current_action: 'Continuous Ingress Monitoring Active',
+  },
+];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const initialTab = urlParams?.get('tab') || 'overview';
@@ -92,12 +125,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [overview, setOverview] = useState<SystemOverview | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [simulator, setSimulator] = useState<SimulatorStatus | null>(null);
+  const [securityVerdict, setSecurityVerdict] = useState<SecurityVerdict | null>(null);
+  const [demoStatus, setDemoStatus] = useState<FacultyDemoStatus | null>(null);
+  const [shieldStatus, setShieldStatus] = useState<ShieldStatus | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [activeAlertsCount, setActiveAlertsCount] = useState<number>(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [notifications, setNotifications] = useState<PlatformNotification[]>(INITIAL_NOTIFICATIONS);
 
   // Website Protection State
   const [protectedWebsite, setProtectedWebsite] = useState<string>('demo.cloudpulse.local');
@@ -112,12 +149,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.history.replaceState({}, '', u.toString());
     }
   }, []);
+
   const [facultyDemoStep, setFacultyDemoStep] = useState<number>(1);
   const [mitigationActive, setMitigationActive] = useState<boolean>(true);
   const [rateLimitEnforced, setRateLimitEnforced] = useState<boolean>(true);
   const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>(INITIAL_SECURITY_EVENTS);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const lastNotifKeyRef = useRef<string>('');
 
   // Sync theme with document element
   useEffect(() => {
@@ -141,6 +180,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   }, []);
 
+  const addNotification = useCallback((notif: Omit<PlatformNotification, 'id' | 'time'>) => {
+    const key = `${notif.severity}-${notif.reason}-${notif.affected_service}`;
+    if (lastNotifKeyRef.current === key) return;
+    lastNotifKeyRef.current = key;
+
+    const newNotif: PlatformNotification = {
+      ...notif,
+      id: `notif-${Date.now()}`,
+      time: new Date().toLocaleTimeString(),
+    };
+    setNotifications((prev) => [newNotif, ...prev.slice(0, 24)]);
+  }, []);
+
   const addSecurityEvent = useCallback((event: Omit<SecurityEvent, 'id' | 'timestamp'>) => {
     const newEvt: SecurityEvent = {
       ...event,
@@ -152,15 +204,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refreshData = useCallback(async () => {
     try {
-      const [ov, svcs, sim, alerts] = await Promise.all([
+      const [ov, svcs, sim, alerts, verdict, demo, shield] = await Promise.all([
         api.getOverview().catch(() => null),
         api.getServices().catch(() => []),
         api.getSimulatorStatus().catch(() => null),
         api.getAlerts().catch(() => []),
+        api.getSecurityVerdict().catch(() => null),
+        api.getDemoStatus().catch(() => null),
+        api.getShieldStatus().catch(() => null),
       ]);
       if (ov) setOverview(ov);
       if (svcs.length > 0) setServices(svcs);
       if (sim) setSimulator(sim);
+      if (verdict) setSecurityVerdict(verdict);
+      if (demo) {
+        setDemoStatus(demo);
+        setFacultyDemoStep(demo.current_stage);
+      }
+      if (shield) {
+        setShieldStatus(shield);
+        setRateLimitEnforced(shield.rate_limiting_enforced);
+      }
       if (alerts) {
         setActiveAlertsCount(alerts.filter((a) => a.status === 'firing').length);
       }
@@ -193,6 +257,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (data.overview) setOverview(data.overview);
             if (data.services) setServices(data.services);
             if (data.simulator) setSimulator(data.simulator);
+            if (data.risk) {
+              setSecurityVerdict({
+                risk_level: data.risk.risk_level,
+                risk_score: data.risk.risk_score,
+                traffic_classification: data.risk.traffic_classification,
+                website_health: data.risk.website_health,
+                security_status: data.risk.security_status,
+                confidence: data.risk.confidence_or_evidence_quality,
+                detected_indicators: data.risk.detected_indicators || [],
+                explanation: data.risk.explanation,
+                recommended_action: data.risk.recommended_action,
+                mitigation_status: data.risk.mitigation_status,
+                simulation_mode: data.risk.simulation_mode,
+                assessed_at: data.risk.assessed_at,
+                last_analysis_time: data.risk.last_analysis_time,
+              });
+            }
+            if (data.demo) {
+              setDemoStatus(data.demo);
+              setFacultyDemoStep(data.demo.current_stage);
+            }
+            if (data.shield) {
+              setShieldStatus(data.shield);
+              setRateLimitEnforced(data.shield.rate_limiting_enforced);
+            }
           } catch (e) {
             // ignore malformed frame
           }
@@ -224,28 +313,112 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [refreshData]);
 
-  // Derive dynamic Threat Level from actual metrics and active simulations
+  // Derive dynamic Threat Level from backend Security Verdict
   const threatLevel: ThreatLevel = useMemo(() => {
+    if (securityVerdict) {
+      if (securityVerdict.risk_level === 'CRITICAL RISK') return 'Critical';
+      if (securityVerdict.risk_level === 'HIGH RISK') return 'High Risk';
+      if (securityVerdict.traffic_classification === 'LEGITIMATE TRAFFIC SURGE') return 'Monitoring';
+      if (securityVerdict.risk_level === 'MEDIUM RISK') return 'Suspicious';
+      return 'Normal';
+    }
     if (simulator?.is_running) {
       const p = simulator.pattern;
       if (p === 'failure' || p === 'flood') return 'Critical';
       if (p === 'burst' || p === 'resource') return 'High Risk';
-      if (p === 'spike' || p === 'gradual') return 'Suspicious';
-      return 'Monitoring';
-    }
-    if (overview) {
-      if (overview.status === 'critical' || (overview.error_rate_percent && overview.error_rate_percent > 5)) {
-        return 'Critical';
-      }
-      if (overview.status === 'degraded' || (overview.error_rate_percent && overview.error_rate_percent > 2)) {
-        return 'High Risk';
-      }
-      if (overview.total_rps > 12 || overview.cpu_utilization_percent > 85) {
-        return 'Suspicious';
-      }
+      if (p === 'spike' || p === 'gradual') return 'Monitoring';
     }
     return 'Normal';
-  }, [simulator, overview]);
+  }, [securityVerdict, simulator]);
+
+  // Auto-dispatch centralized notifications when verdict status changes
+  useEffect(() => {
+    if (!securityVerdict) return;
+
+    if (securityVerdict.risk_level === 'CRITICAL RISK') {
+      addNotification({
+        severity: 'CRITICAL',
+        reason: securityVerdict.explanation,
+        affected_service: 'api-gateway / order-service',
+        current_action: securityVerdict.mitigation_status,
+        incident_link: 'INC-2026-081',
+      });
+    } else if (securityVerdict.risk_level === 'HIGH RISK') {
+      addNotification({
+        severity: 'HIGH',
+        reason: securityVerdict.explanation,
+        affected_service: 'api-gateway',
+        current_action: securityVerdict.mitigation_status,
+        incident_link: 'INC-2026-081',
+      });
+    } else if (securityVerdict.traffic_classification === 'LEGITIMATE TRAFFIC SURGE') {
+      addNotification({
+        severity: 'MEDIUM',
+        reason: 'Legitimate traffic surge observed. Traffic is uniform; error rate is nominal.',
+        affected_service: 'ingress-gateway',
+        current_action: 'Capacity observed; HPA scaling ready',
+      });
+    } else if (demoStatus?.current_stage === 6) {
+      addNotification({
+        severity: 'RECOVERY',
+        reason: 'Website traffic stabilized; error rate restored to 0.0%, latency nominal.',
+        affected_service: 'cluster-wide',
+        current_action: 'All endpoints reporting HEALTHY',
+      });
+    }
+  }, [securityVerdict?.risk_level, securityVerdict?.traffic_classification, demoStatus?.current_stage, addNotification]);
+
+  // Faculty Demo Controls
+  const startFacultyDemo = useCallback(async () => {
+    try {
+      const res = await api.startFacultyDemo();
+      setDemoStatus(res);
+      addToast('Faculty Demonstration started!', 'success');
+    } catch (err: any) {
+      addToast(err?.message || 'Could not start demo.', 'error');
+    }
+  }, [addToast]);
+
+  const pauseFacultyDemo = useCallback(async () => {
+    try {
+      const res = await api.pauseFacultyDemo();
+      setDemoStatus(res);
+      addToast('Demonstration paused.', 'info');
+    } catch (err: any) {
+      addToast(err?.message || 'Could not pause demo.', 'error');
+    }
+  }, [addToast]);
+
+  const resumeFacultyDemo = useCallback(async () => {
+    try {
+      const res = await api.resumeFacultyDemo();
+      setDemoStatus(res);
+      addToast('Demonstration resumed.', 'info');
+    } catch (err: any) {
+      addToast(err?.message || 'Could not resume demo.', 'error');
+    }
+  }, [addToast]);
+
+  const stopFacultyDemo = useCallback(async () => {
+    try {
+      const res = await api.stopFacultyDemo();
+      setDemoStatus(res);
+      addToast('Demonstration stopped.', 'info');
+    } catch (err: any) {
+      addToast(err?.message || 'Could not stop demo.', 'error');
+    }
+  }, [addToast]);
+
+  const resetFacultyDemo = useCallback(async () => {
+    try {
+      const res = await api.resetFacultyDemo();
+      setDemoStatus(res);
+      await refreshData();
+      addToast('System reset to clean baseline.', 'success');
+    } catch (err: any) {
+      addToast(err?.message || 'Could not reset demo.', 'error');
+    }
+  }, [addToast, refreshData]);
 
   // Global keyboard shortcut: Ctrl+K / Cmd+K for command palette
   useEffect(() => {
@@ -269,6 +442,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         overview,
         services,
         simulator,
+        securityVerdict,
+        demoStatus,
+        shieldStatus,
         isInitialLoading,
         activeAlertsCount,
         isCommandPaletteOpen,
@@ -277,6 +453,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsNotificationOpen,
         toasts,
         addToast,
+        notifications,
+        addNotification,
         refreshData,
         selectedServiceId,
         setSelectedServiceId,
@@ -301,6 +479,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTheme,
         toggleTheme,
         wsConnected,
+
+        // Demo controls
+        startFacultyDemo,
+        pauseFacultyDemo,
+        resumeFacultyDemo,
+        stopFacultyDemo,
+        resetFacultyDemo,
       }}
     >
       {children}

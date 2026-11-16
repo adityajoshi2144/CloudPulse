@@ -19,6 +19,27 @@ async def get_risk_analysis():
     return risk_engine.calculate()
 
 
+@router.get("/verdict")
+async def get_security_verdict():
+    """Returns the primary CloudPulse Security Verdict for the Executive Dashboard."""
+    full = risk_engine.calculate()
+    return {
+        "risk_level": full["risk_level"],
+        "risk_score": full["risk_score"],
+        "traffic_classification": full["traffic_classification"],
+        "website_health": full["website_health"],
+        "security_status": full["security_status"],
+        "confidence": full["confidence_or_evidence_quality"],
+        "detected_indicators": full["detected_indicators"],
+        "explanation": full["explanation"],
+        "recommended_action": full["recommended_action"],
+        "mitigation_status": full["mitigation_status"],
+        "simulation_mode": full["simulation_mode"],
+        "assessed_at": full["assessed_at"],
+        "last_analysis_time": full["last_analysis_time"],
+    }
+
+
 @router.get("/config")
 async def get_risk_configuration():
     return risk_engine.get_config()

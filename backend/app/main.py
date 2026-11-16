@@ -11,6 +11,9 @@ from app.core.cache import cache_service
 from app.core.metrics_collector import metrics_collector
 from app.core.telemetry_state import telemetry_state
 from app.services.simulator_engine import simulator_engine
+from app.services.risk_engine import risk_engine
+from app.services.demo_engine import demo_engine
+from app.services.shield_service import shield_service
 
 from app.routers import (
     health,
@@ -25,7 +28,9 @@ from app.routers import (
     audit,
     slo,
     risk,
-    reports
+    reports,
+    demo,
+    shield
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -46,7 +51,10 @@ async def telemetry_background_loop():
                     "type": "TELEMETRY_UPDATE",
                     "overview": telemetry_state.get_system_overview(),
                     "services": list(telemetry_state.services.values()),
-                    "simulator": simulator_engine.get_status()
+                    "simulator": simulator_engine.get_status(),
+                    "risk": risk_engine.calculate(),
+                    "demo": demo_engine.get_status(),
+                    "shield": shield_service.get_status(),
                 })
                 # Broadcast concurrently
                 dead_sockets = []
@@ -129,6 +137,8 @@ app.include_router(audit.router, prefix=settings.API_V1_STR)
 app.include_router(slo.router, prefix=settings.API_V1_STR)
 app.include_router(risk.router, prefix=settings.API_V1_STR)
 app.include_router(reports.router, prefix=settings.API_V1_STR)
+app.include_router(demo.router, prefix=settings.API_V1_STR)
+app.include_router(shield.router, prefix=settings.API_V1_STR)
 
 # Also expose standard /metrics endpoint for Prometheus scrapers
 app.include_router(metrics.router, prefix="")
@@ -144,7 +154,10 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
             "type": "INITIAL_STATE",
             "overview": telemetry_state.get_system_overview(),
             "services": list(telemetry_state.services.values()),
-            "simulator": simulator_engine.get_status()
+            "simulator": simulator_engine.get_status(),
+            "risk": risk_engine.calculate(),
+            "demo": demo_engine.get_status(),
+            "shield": shield_service.get_status(),
         })
         await websocket.send_text(initial_payload)
         while True:

@@ -23,4 +23,7 @@ async def trigger_recovery(incident_id: str | None = None):
 
 @router.get("/{incident_id}/rca")
 async def get_incident_rca(incident_id: str):
-    raise HTTPException(status_code=404, detail="Incident not found")
+    rca = incident_service.get_rca(incident_id)
+    if not rca:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return rca

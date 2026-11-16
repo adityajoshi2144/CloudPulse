@@ -41,6 +41,7 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
     toggleTheme,
     wsConnected,
     threatLevel,
+    notifications,
   } = useApp();
 
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
@@ -289,7 +290,7 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-cyan-400" />
-              <h2 className="text-sm font-semibold text-slate-100">Website Protection Alerts</h2>
+              <h2 className="text-sm font-semibold text-slate-100">Centralized Notifications</h2>
             </div>
             <button
               onClick={() => setIsNotificationOpen(false)}
@@ -299,30 +300,64 @@ export const TopBar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            <div className="p-3 rounded-lg bg-surface-200/80 border border-border text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-200 font-medium">Protection Status</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-                  SHIELD ACTIVE
-                </span>
-              </div>
-              <p className="text-slate-400 text-[11px] mt-1.5">
-                Target: <span className="font-mono text-cyan-300">{protectedWebsite}</span>
-              </p>
-              <p className="text-slate-400 text-[11px]">
-                API Status: {overview?.status ?? 'healthy'} · Observed RPS: {overview?.total_rps ?? 0}
-              </p>
-              <div className="mt-3 pt-2 border-t border-border/60">
-                <button
-                  onClick={() => {
-                    setActiveTab('alerts');
-                    setIsNotificationOpen(false);
-                  }}
-                  className="w-full py-1.5 rounded bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors"
+            {notifications.map((notif) => {
+              const badgeClass =
+                notif.severity === 'CRITICAL'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : notif.severity === 'HIGH'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : notif.severity === 'MEDIUM'
+                  ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
+                  : notif.severity === 'RECOVERY'
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+
+              return (
+                <div
+                  key={notif.id}
+                  className="p-3 rounded-xl bg-surface-200/80 border border-border text-xs space-y-1.5 shadow-sm"
                 >
-                  View Alerts Center ({activeAlertsCount}) <ExternalLink className="w-3 h-3" />
-                </button>
-              </div>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${badgeClass}`}>
+                      {notif.severity}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">{notif.time}</span>
+                  </div>
+                  <p className="text-slate-200 font-sans text-xs leading-snug">{notif.reason}</p>
+                  <div className="text-[11px] font-mono text-slate-400">
+                    <span>Affected Service: </span>
+                    <strong className="text-slate-300">{notif.affected_service}</strong>
+                  </div>
+                  <div className="text-[11px] font-mono text-slate-400">
+                    <span>Current Action: </span>
+                    <span className="text-emerald-400">{notif.current_action}</span>
+                  </div>
+                  {notif.incident_link && (
+                    <button
+                      onClick={() => {
+                        setActiveTab('incidents');
+                        setIsNotificationOpen(false);
+                      }}
+                      className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 pt-1"
+                    >
+                      <span>View Incident ({notif.incident_link})</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="pt-2 border-t border-border/60">
+              <button
+                onClick={() => {
+                  setActiveTab('alerts');
+                  setIsNotificationOpen(false);
+                }}
+                className="w-full py-1.5 rounded bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors"
+              >
+                View Alerts Center ({activeAlertsCount}) <ExternalLink className="w-3 h-3" />
+              </button>
             </div>
           </div>
         </div>

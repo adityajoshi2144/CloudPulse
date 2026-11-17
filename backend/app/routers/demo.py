@@ -36,10 +36,23 @@ async def reset_faculty_demo():
     """Reset the demonstration and cluster back to clean nominal baseline."""
     return await demo_engine.reset()
 
+@router.post("/step/{stage}")
+async def run_demo_step(stage: int):
+    """Run a specific single demonstration stage."""
+    try:
+        return await demo_engine.run_single_step(stage)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 @router.get("/report")
 async def get_faculty_demo_report():
     """Get the final compiled demonstration report."""
     report = demo_engine.get_report()
     if not report:
-        raise HTTPException(status_code=404, detail="No demonstration report available yet. Run the demonstration first.")
+        return {
+            "available": False,
+            "status": "not_started",
+            "message": "No demonstration report available yet. Run the demonstration first.",
+            "report": None,
+        }
     return report

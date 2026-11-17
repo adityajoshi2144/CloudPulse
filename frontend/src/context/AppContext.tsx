@@ -70,6 +70,7 @@ interface AppContextType {
   resumeFacultyDemo: () => Promise<void>;
   stopFacultyDemo: () => Promise<void>;
   resetFacultyDemo: () => Promise<void>;
+  runDemoStep: (stage: number) => Promise<FacultyDemoStatus>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -420,6 +421,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [addToast, refreshData]);
 
+  const runDemoStep = useCallback(async (stage: number): Promise<FacultyDemoStatus> => {
+    try {
+      const res = await api.runDemoStep(stage);
+      setDemoStatus(res);
+      setFacultyDemoStep(stage);
+      await refreshData();
+      addToast(`Demonstration Stage ${stage} executed successfully.`, 'info');
+      return res;
+    } catch (err: any) {
+      addToast(err?.message || `Could not run stage ${stage}.`, 'error');
+      throw err;
+    }
+  }, [addToast, refreshData]);
+
   // Global keyboard shortcut: Ctrl+K / Cmd+K for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -486,6 +501,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resumeFacultyDemo,
         stopFacultyDemo,
         resetFacultyDemo,
+        runDemoStep,
       }}
     >
       {children}

@@ -318,26 +318,24 @@ export const OverviewPage: React.FC = () => {
             return (
               <div
                 key={stg.num}
-                className={`p-2.5 rounded-xl border transition-all ${
-                  isCurrent
-                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md ring-1 ring-cyan-400/50'
-                    : isCompleted
+                className={`p-2.5 rounded-xl border transition-all ${isCurrent
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md ring-1 ring-cyan-400/50'
+                  : isCompleted
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
                     : 'bg-surface-200/40 border-border/50 text-slate-500'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold tracking-tight">
                     {stg.label}
                   </span>
                   <span
-                    className={`h-2 w-2 rounded-full ${
-                      isCurrent
-                        ? 'bg-cyan-400 animate-ping'
-                        : isCompleted
+                    className={`h-2 w-2 rounded-full ${isCurrent
+                      ? 'bg-cyan-400 animate-ping'
+                      : isCompleted
                         ? 'bg-emerald-400'
                         : 'bg-slate-700'
-                    }`}
+                      }`}
                   />
                 </div>
                 <p className="text-[11px] font-medium text-slate-300 mt-1 truncate">
@@ -413,13 +411,12 @@ export const OverviewPage: React.FC = () => {
               <div className="px-3.5 py-1.5 rounded-lg bg-surface-200/90 border border-border text-xs font-mono flex items-center gap-2">
                 <span className="text-slate-400">Website Health:</span>
                 <span
-                  className={`font-bold ${
-                    currentVerdict.website_health === 'Healthy'
-                      ? 'text-emerald-400'
-                      : currentVerdict.website_health === 'Degraded'
+                  className={`font-bold ${currentVerdict.website_health === 'Healthy'
+                    ? 'text-emerald-400'
+                    : currentVerdict.website_health === 'Degraded'
                       ? 'text-amber-400'
                       : 'text-rose-400'
-                  }`}
+                    }`}
                 >
                   {currentVerdict.website_health}
                 </span>
@@ -574,24 +571,21 @@ export const OverviewPage: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-slate-400 font-medium truncate">HTTP Error Rate</span>
               <div
-                className={`p-1.5 rounded-lg border ${
-                  (overview?.error_rate_percent ?? 0) >= 2
-                    ? 'border-rose-500/30 bg-rose-500/10'
-                    : 'border-emerald-500/30 bg-emerald-500/10'
-                }`}
+                className={`p-1.5 rounded-lg border ${(overview?.error_rate_percent ?? 0) >= 2
+                  ? 'border-rose-500/30 bg-rose-500/10'
+                  : 'border-emerald-500/30 bg-emerald-500/10'
+                  }`}
               >
                 <AlertTriangle
-                  className={`w-3.5 h-3.5 ${
-                    (overview?.error_rate_percent ?? 0) >= 2 ? 'text-rose-400' : 'text-emerald-400'
-                  }`}
+                  className={`w-3.5 h-3.5 ${(overview?.error_rate_percent ?? 0) >= 2 ? 'text-rose-400' : 'text-emerald-400'
+                    }`}
                 />
               </div>
             </div>
             <div className="flex items-baseline gap-1.5">
               <span
-                className={`text-2xl font-bold font-mono ${
-                  (overview?.error_rate_percent ?? 0) >= 2 ? 'text-rose-400' : 'text-slate-100'
-                }`}
+                className={`text-2xl font-bold font-mono ${(overview?.error_rate_percent ?? 0) >= 2 ? 'text-rose-400' : 'text-slate-100'
+                  }`}
               >
                 {metricValue(overview?.error_rate_percent, 2)}%
               </span>
@@ -657,13 +651,12 @@ export const OverviewPage: React.FC = () => {
                       </span>
                     </div>
                     <span
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
-                        ind.severity === 'critical'
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                          : ind.severity === 'warning'
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${ind.severity === 'critical'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        : ind.severity === 'warning'
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                           : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      }`}
+                        }`}
                     >
                       {ind.status}
                     </span>
@@ -728,22 +721,22 @@ export const OverviewPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action 2: Simulated HPA Scaling */}
+              {/* Action 2: Shield Rate-Limiting & Ingress Quarantine */}
               <div className="p-3.5 rounded-xl bg-surface-200/60 border border-border/80">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-bold text-slate-200">
-                    Horizontal Pod Auto-Scaling (HPA)
+                    Automated Ingress Quarantine &amp; Throttling
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold">
-                    SIMULATED ACTION
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                    REAL ACTION
                   </span>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Autoscaler dynamically provisioned 2 → 4 pod replicas for order-service and api-gateway to absorb visitor surge without collapse.
+                  CloudPulse Shield intercepts abnormal burst floods at the ASGI gateway layer. Requests above 20 req/s receive HTTP 429 to protect backend capacity.
                 </p>
                 <div className="mt-1.5 text-[11px] font-mono text-slate-400 flex items-center justify-between">
-                  <span>Engine: Simulated HPA Policy</span>
-                  <span>Active Replicas: 4 pods</span>
+                  <span>Enforcement: In-process ASGI Filter</span>
+                  <span>Mitigation Cap: {shieldStatus?.rate_limit_rps ?? 20} req/s</span>
                 </div>
               </div>
 
@@ -899,11 +892,11 @@ export const OverviewPage: React.FC = () => {
               </div>
 
               <div className="p-3 rounded-xl bg-surface-200/50 border border-border">
-                <span className="text-[11px] text-slate-400 font-mono block">Simulated Replicas</span>
-                <span className="text-lg font-bold font-mono text-cyan-300">
-                  4 pods
+                <span className="text-[11px] text-slate-400 font-mono block">Shield Rate Filter</span>
+                <span className="text-lg font-bold font-mono text-emerald-400">
+                  {shieldStatus?.rate_limiting_enforced ? 'ACTIVE' : 'STANDBY'}
                 </span>
-                <span className="text-[10px] text-slate-500 block mt-0.5">order-service + api-gateway</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Cap: {shieldStatus?.rate_limit_rps ?? 20} req/s cap</span>
               </div>
             </div>
 

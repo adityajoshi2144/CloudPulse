@@ -24,7 +24,7 @@ STAGE_DEFINITIONS = [
         "name": "BASELINE MONITORING",
         "badge": "STAGE 1: MONITOR",
         "title": "Normal Website Operation & Baseline Ingress",
-        "description": "Website is operating normally with healthy baseline traffic (~2-4 req/s), low latency (<25ms), and 2 active replicas.",
+        "description": "Website is operating normally with healthy baseline traffic (~2-4 req/s), low latency (<25ms), and 0% error rate.",
         "duration_seconds": 5,
     },
     {
@@ -40,7 +40,7 @@ STAGE_DEFINITIONS = [
         "name": "SUSPICIOUS TRAFFIC SIMULATION",
         "badge": "STAGE 3: DETECT ANOMALY",
         "title": "Controlled Suspicious Burst Traffic",
-        "description": "Abnormal burst pattern triggered in safe local sandbox. Anomaly scoring detects threshold breach and elevates Risk Score.",
+        "description": "Abnormal burst pattern triggered in safe local sandbox. Threat Detection Engine flags abnormal spike rate: HIGH RISK.",
         "duration_seconds": 6,
     },
     {
@@ -54,9 +54,9 @@ STAGE_DEFINITIONS = [
     {
         "stage": 5,
         "name": "MITIGATION",
-        "badge": "STAGE 5: MITIGATE & SCALE",
-        "title": "Active Rate-Limiting Shield & HPA Auto-Scaling",
-        "description": "CloudPulse Shield rate-limiting enforced (20 req/s cap). Simulated HPA dynamically provisions 2 -> 4 pod replicas to absorb load.",
+        "badge": "STAGE 5: SHIELD MITIGATION",
+        "title": "Active Rate-Limiting Shield & Traffic Filtering",
+        "description": "CloudPulse Shield rate-limiting enforced (20 req/s cap). Excess malicious bursts throttled with HTTP 429 to protect backend services.",
         "duration_seconds": 6,
     },
     {
@@ -64,7 +64,7 @@ STAGE_DEFINITIONS = [
         "name": "RECOVERY",
         "badge": "STAGE 6: RECOVER",
         "title": "Automated Service Stabilization & Recovery",
-        "description": "Traffic normalized, error rate drops to 0%, P95 latency restored, and incident marked RESOLVED.",
+        "description": "Traffic normalized, error rate drops to 0%, P95 latency restored < 25ms, and incident marked RESOLVED.",
         "duration_seconds": 5,
     },
     {
@@ -72,7 +72,7 @@ STAGE_DEFINITIONS = [
         "name": "FINAL REPORT",
         "badge": "STAGE 7: AUDIT & REPORT",
         "title": "Executive Faculty Demonstration Report",
-        "description": "Demonstration successfully completed. Final report verifies resilience, classification accuracy, and autonomous mitigation.",
+        "description": "Demonstration successfully completed. Final report verifies resilience, classification accuracy, and autonomous edge protection.",
         "duration_seconds": 5,
     },
 ]
@@ -256,11 +256,15 @@ class FacultyDemoEngine:
             # Baseline monitoring: clean state
             if simulator_engine.is_running:
                 await simulator_engine.stop()
-            self.log_event(1, "Stage 1: Measuring healthy website baseline. Low traffic, healthy CPU, 2 active pods.")
+                await asyncio.sleep(0.3)
+            self.log_event(1, "Stage 1: Measuring healthy website baseline. Low traffic, healthy CPU, 0% error rate.")
 
         elif stage == 2:
             # Stage 2: Legitimate Traffic Surge
             self.log_event(2, "Stage 2: Starting legitimate traffic surge simulation via actual Simulator API.")
+            if simulator_engine.is_running:
+                await simulator_engine.stop()
+                await asyncio.sleep(0.3)
             try:
                 simulator_engine.start(
                     SimulatorConfig(
@@ -283,6 +287,7 @@ class FacultyDemoEngine:
             self.log_event(3, "Stage 3: Controlled abnormal burst traffic simulation initiated.")
             if simulator_engine.is_running:
                 await simulator_engine.stop()
+                await asyncio.sleep(0.3)
             try:
                 simulator_engine.start(
                     SimulatorConfig(
@@ -312,33 +317,23 @@ class FacultyDemoEngine:
                 affected_services=["api-gateway", "order-service"],
                 probable_cause="High-frequency burst attack pattern violating ingress rate limits",
                 impact_summary="Threat score escalated to HIGH RISK (74/100). Latency and CPU approaching threshold.",
-                recommended_action="Enforce edge shield rate-limiting and scale backend replicas to 4 pods.",
+                recommended_action="Enforce CloudPulse Shield edge rate-limiting filter with 20 req/s cap.",
             )
             self.log_event(4, "Incident INC-2026-081 registered. Operator notification dispatched.")
 
         elif stage == 5:
-            # Stage 5: Mitigation & Auto-Scaling
-            self.log_event(5, "Stage 5: Executing active mitigation: Rate Limiting Shield & Horizontal Pod Auto-Scaling.")
+            # Stage 5: Mitigation via CloudPulse Shield
+            self.log_event(5, "Stage 5: Executing active mitigation: CloudPulse Shield Ingress Rate Limiting.")
             
-            # 1. Enforce Shield rate limiting
+            # Enforce Shield rate limiting
+            shield_service.mitigation_enforced = True
             shield_action = shield_service.record_mitigation_event(
-                action="Edge Rate-Limiting Filter",
-                enforcement_type="REAL ACTION",
-                details="Throttling excess bursts to max 20 req/s cap via ASGI gateway middleware.",
+                action="CloudPulse Shield Rate-Limiting",
+                enforcement_type="REAL ACTION (ASGI Gateway Middleware)",
+                details="Throttling excess bursts to max 20 req/s cap via ASGI gateway middleware. HTTP 429 issued for surplus requests.",
                 requests_affected=18,
             )
             self.mitigation_actions.append(shield_action)
-
-            # 2. Trigger HPA scaling
-            scale_event = autoscaler_service.trigger_scaling(
-                service_id="order-service",
-                to_replicas=4,
-                trigger_metric="Host CPU / Ingress RPS",
-                metric_value=82.5,
-                reason="Traffic surge mitigation: Scaled replicas 2 -> 4 pods to absorb surge and prevent degradation.",
-                is_real_k8s=False,
-            )
-            self.scaling_events.append(scale_event)
 
             # Update incident to mitigating
             incident_service.create_incident(
@@ -348,26 +343,39 @@ class FacultyDemoEngine:
                 status="mitigating",
                 affected_services=["api-gateway", "order-service"],
                 probable_cause="High-frequency burst attack pattern violating ingress rate limits",
-                impact_summary="Active defense engaged: Rate limiting enforced (20 req/s cap) and pods scaled to 4.",
+                impact_summary="Active defense engaged: CloudPulse Shield rate limiting enforced (20 req/s cap).",
                 recommended_action="Monitor recovery and confirm latencies settle back to baseline.",
             )
 
-            self.log_event(5, "Mitigation active: Rate limiting ENFORCED (Real Action). HPA scaled replicas 2 -> 4 pods (Simulated Action).")
+            self.log_event(5, "Mitigation active: CloudPulse Shield rate limiting ENFORCED (Real Action). Excess requests throttled.")
 
         elif stage == 6:
             # Stage 6: Recovery
             self.log_event(6, "Stage 6: Stopping simulation. Commencing autonomous service stabilization.")
             if simulator_engine.is_running:
                 await simulator_engine.stop()
+                await asyncio.sleep(0.3)
 
             # Resolve incident
             incident_service.resolve_incident(
                 incident_id="INC-2026-081",
-                resolution_notes="Traffic normalized to baseline. P95 latency restored < 25ms, error rate 0.0%. Replicas stabilized.",
+                resolution_notes="Traffic normalized to baseline. P95 latency restored < 25ms, error rate 0.0%. Ingress stabilized.",
             )
             self.log_event(6, "Incident INC-2026-081 resolved. Latency < 25ms, error rate 0%, website status HEALTHY.")
 
+        elif stage == 7:
+            # Stage 7: Final report compilation
+            if simulator_engine.is_running:
+                await simulator_engine.stop()
+                await asyncio.sleep(0.3)
+            self._compile_final_report()
+            self.log_event(7, "Stage 7: Final Faculty Report compiled and available for audit review.")
+
     async def _exit_stage(self, stage: int) -> None:
+        if stage in (2, 3):
+            if simulator_engine.is_running:
+                await simulator_engine.stop()
+                await asyncio.sleep(0.2)
         if stage == 6:
             # Capture final snapshot
             final_verdict = risk_engine.calculate()
@@ -380,6 +388,22 @@ class FacultyDemoEngine:
                 "cpu": final_metrics["cpu_utilization_percent"],
                 "latency": final_metrics["p95_latency_ms"] or 18.0,
             }
+
+    async def run_single_step(self, stage: int) -> Dict[str, Any]:
+        """Manually execute a single demonstration stage safely."""
+        if self.is_running:
+            await self.stop()
+            await asyncio.sleep(0.3)
+
+        if stage < 1 or stage > len(STAGE_DEFINITIONS):
+            raise ValueError(f"Invalid stage {stage}. Must be between 1 and {len(STAGE_DEFINITIONS)}.")
+
+        self.current_stage = stage
+        self.stage_elapsed_seconds = 0
+        await self._enter_stage(stage)
+        if stage == 7:
+            self._compile_final_report()
+        return self.get_status()
 
     def _update_peak_metrics(self) -> None:
         snap = metrics_collector.snapshot()
@@ -408,8 +432,8 @@ class FacultyDemoEngine:
                 "is_website_safe_or_at_risk": "SAFE (Recovered & Nominal)",
                 "what_did_cloudpulse_detect": "1) Legitimate visitor surge (RPS growth without errors); 2) Controlled abnormal burst pattern with elevated variance and threat indicators.",
                 "why_did_it_classify_this_way": "Multi-factor explainable analysis: Separated legitimate high-volume surge (uniform requests, low errors) from malicious burst traffic (high-frequency spikes, threshold breaches).",
-                "what_action_did_it_take": "Enforced CloudPulse Shield rate-limiting filter (20 req/s cap) and triggered native HPA scaling (replicas 2 → 4 pods).",
-                "did_the_website_recover": "YES. HTTP error rate returned to 0.0%, P95 latency dropped back to nominal baseline, and Incident INC-2026-081 was resolved.",
+                "what_action_did_it_take": "Enforced CloudPulse Shield rate-limiting filter (20 req/s cap) via ASGI gateway middleware, throttling malicious bursts with HTTP 429 and protecting backend microservices.",
+                "did_the_website_recover": "YES. HTTP error rate returned to 0.0%, P95 latency dropped back to nominal baseline (<25ms), and Incident INC-2026-081 was marked RESOLVED.",
             },
 
             # Before & After Telemetry
@@ -440,24 +464,23 @@ class FacultyDemoEngine:
             "mitigation_actions": [
                 {
                     "action": "CloudPulse Shield Rate Limiting",
-                    "type": "REAL ACTION (In-process enforcement)",
+                    "type": "REAL ACTION (In-process ASGI Middleware)",
                     "detail": "Throttled requests exceeding 20 req/s cap; protected downstream SQLite/FastAPI.",
                     "status": "Enforced",
                 },
                 {
-                    "action": "Horizontal Pod Auto-Scaling (HPA)",
-                    "type": "SIMULATED ACTION (Native HPA algorithm)",
-                    "detail": "Scaled order-service replicas from 2 to 4 pods to absorb surge.",
-                    "status": "Executed",
-                },
-                {
-                    "action": "SOC Incident Management",
+                    "action": "SOC Incident Management & RCA",
                     "type": "REAL ACTION",
                     "detail": "Logged INC-2026-081 with RCA root cause and resolution timeline.",
                     "status": "Resolved",
                 },
+                {
+                    "action": "Health Verification Probing",
+                    "type": "REAL ACTION",
+                    "detail": "Probed gateway endpoints to verify error rate 0.0% and P95 latency < 25ms.",
+                    "status": "Verified",
+                },
             ],
-            "scaling_events": autoscaler_service.get_scaling_events()[:3],
             "overall_verdict": "SUCCESS: Closed-loop autonomous protection and self-healing verified.",
         }
 

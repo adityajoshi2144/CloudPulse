@@ -248,6 +248,11 @@ class SimulatorEngine:
         self.test_service_failed = False
         endpoint_recovered = not self.test_service_failed
         self.scenario_status = status
+
+        # Capture metrics and calculate risk while telemetry_state still holds simulation attributes
+        snapshot_after = metrics_collector.snapshot()
+        risk_after = risk_engine.calculate()
+
         telemetry_state.simulator_active = False
         telemetry_state.simulator_pattern = "idle"
         telemetry_state.simulator_vusers = 0
@@ -268,9 +273,9 @@ class SimulatorEngine:
                 elapsed_seconds=self.elapsed_seconds,
                 timeline=self.timeline_data,
                 metrics_before=self._metrics_before,
-                metrics_after=metrics_collector.snapshot(),
+                metrics_after=snapshot_after,
                 risk_before=self._risk_before,
-                risk_after=risk_engine.calculate(),
+                risk_after=risk_after,
                 test_endpoint_available=endpoint_recovered,
             )
             self.report_id = report["id"]

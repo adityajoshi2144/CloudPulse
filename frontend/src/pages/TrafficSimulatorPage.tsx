@@ -554,20 +554,21 @@ export const TrafficSimulatorPage: React.FC = () => {
           </div>
 
           {/* Status Alert or Completion */}
-          {status?.scenario_status === 'completed' && (
+          {(status?.report_id || status?.scenario_status === 'completed' || status?.scenario_status === 'request_limit_reached') && (
             <div className="mt-4 p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Simulation completed successfully. Process-local report generated.</span>
+                <span>Simulation complete. Executive Security Report with Final Risk Verdict generated.</span>
               </div>
-              {status.report_id && (
+              {status?.report_id && (
                 <a
                   href={`/api/reports/${status.report_id}/pdf`}
+                  download={`CloudPulse-Security-Report-${status.report_id.slice(0, 8)}.pdf`}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold font-mono text-[11px] flex items-center gap-1 transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-[11px] flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                 >
-                  <Download className="w-3 h-3" />
+                  <Download className="w-3.5 h-3.5" />
                   <span>Download Report (PDF)</span>
                 </a>
               )}

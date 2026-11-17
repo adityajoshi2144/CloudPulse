@@ -74,7 +74,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
     {
       title: 'INFRASTRUCTURE & RESILIENCE',
       items: [
-        { id: 'scaling', label: 'Auto-Scaling (HPA)', icon: TrendingUp },
+        { id: 'scaling', label: 'Ingress Shield & Protection', icon: ShieldCheck },
         { id: 'services', label: 'Service Catalog', icon: Server },
         { id: 'infrastructure', label: 'Infrastructure Map', icon: Box },
       ],

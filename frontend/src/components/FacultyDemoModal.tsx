@@ -1,35 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { api } from '../services/api';
 import {
   ShieldCheck,
   Zap,
   AlertTriangle,
   Bell,
   Cpu,
-  Layers,
   CheckCircle2,
   X,
   Play,
   RotateCcw,
   ArrowRight,
-  TrendingUp,
   Activity,
   FileText,
   Clock,
   Sparkles,
-  ExternalLink,
   ShieldAlert,
-  Server
+  Pause,
+  Square,
+  Lock,
+  ArrowUpRight
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer
-} from 'recharts';
 
 interface StepInfo {
   number: number;
@@ -50,7 +41,7 @@ const DEMO_STEPS: StepInfo[] = [
     title: 'Normal Website Operation',
     subtitle: 'Healthy baseline ingress, stable response latencies, and nominal host resource utilization.',
     workflowStage: 'MONITOR',
-    expectedOutcome: 'Incoming traffic steady (~4-8 req/s), latency < 25ms, CPU < 40%, 2 active replicas.',
+    expectedOutcome: 'Incoming traffic steady (~2-4 req/s), latency < 25ms, CPU < 40%, 0% error rate.',
     explanation:
       'CloudPulse continuously monitors HTTP traffic passing through the ingress gateway. Telemetry collector samples real-time throughput, P95 latency percentiles, error rates, and host CPU/memory metrics.',
   },
@@ -61,9 +52,9 @@ const DEMO_STEPS: StepInfo[] = [
     title: 'Legitimate Traffic Surge',
     subtitle: 'Simulated high-volume visitor traffic (flash sale or viral campaign) testing capacity.',
     workflowStage: 'DETECT',
-    expectedOutcome: 'Traffic climbs up to 15-20 req/s, host CPU utilization rises, latency remains bounded.',
+    expectedOutcome: 'Traffic climbs up to 10-15 req/s, host CPU rises, classified as LEGITIMATE TRAFFIC SURGE (Low Risk).',
     explanation:
-      'A safe, bounded local traffic spike is dispatched to the in-process test endpoint. Telemetry graphs immediately reflect the surge, verifying that the monitoring pipeline accurately captures traffic spikes.',
+      'A safe, bounded local traffic spike is dispatched to the in-process test endpoint. CloudPulse observes uniform requests with low error rates, correctly distinguishing legitimate spikes from DDoS attacks.',
   },
   {
     number: 3,
@@ -72,9 +63,9 @@ const DEMO_STEPS: StepInfo[] = [
     title: 'Suspicious Traffic & Threat Detection',
     subtitle: 'Abnormal burst / flood pattern triggered; anomaly scoring rules detect threshold breach.',
     workflowStage: 'ALERT',
-    expectedOutcome: 'Threat level transitions from Normal to HIGH RISK / CRITICAL; anomaly reason logged.',
+    expectedOutcome: 'Threat level transitions from Normal to HIGH RISK (74/100); abnormal burst flood flagged.',
     explanation:
-      'The engine observes rapid burst spikes exceeding configured baseline variance. Explainable weighted risk algorithms evaluate the anomaly score, flag suspicious patterns, and prepare mitigation policies.',
+      'The Threat Engine observes rapid burst spikes exceeding configured baseline variance. Explainable weighted risk algorithms evaluate the anomaly score, flag suspicious patterns, and prepare mitigation policies.',
   },
   {
     number: 4,
@@ -83,20 +74,20 @@ const DEMO_STEPS: StepInfo[] = [
     title: 'Automated Alert & Incident Dispatch',
     subtitle: 'Instant operator notifications and automated incident timeline logging.',
     workflowStage: 'ANALYZE',
-    expectedOutcome: 'High-severity alert ALT-CRIT fired, operator notified, Root Cause Analysis initiated.',
+    expectedOutcome: 'High-severity alert ALT-CRIT-99 fired, SOC Incident INC-2026-081 logged with Root Cause Analysis.',
     explanation:
-      'Upon crossing threshold limits, CloudPulse dispatches immediate visual alerts with metric breach details, logs an active incident, and alerts site reliability operators without human delay.',
+      'Upon crossing threshold limits, CloudPulse dispatches immediate visual alerts with metric breach details, logs an active incident in the SOC queue, and notifies operators without human delay.',
   },
   {
     number: 5,
-    id: 'mitigation_scaling',
-    badge: 'STAGE 5: MITIGATE & SCALE',
-    title: 'Automated Protection & HPA Scaling',
-    subtitle: 'Edge rate-limiting policy actively throttles bursts while native HPA scales replicas.',
+    id: 'mitigation_shield',
+    badge: 'STAGE 5: SHIELD MITIGATION',
+    title: 'Automated Protection: CloudPulse Shield Rate-Limiting',
+    subtitle: 'Edge rate-limiting policy actively throttles bursts at 20 req/s cap to protect downstream services.',
     workflowStage: 'MITIGATE',
-    expectedOutcome: 'Rate limit policy enforced (20 req/s cap); native HPA scales replicas from 2 to 4 pods.',
+    expectedOutcome: 'CloudPulse Shield rate-limiting enforced (20 req/s cap); excess bursts throttled with HTTP 429.',
     explanation:
-      'Dual-layer defense activates: CloudPulse Shield applies rate-limiting to protect backend databases, while the auto-scaler evaluates CPU pressure and issues horizontal scaling events to absorb legitimate traffic.',
+      'Active defense engages: CloudPulse Shield applies in-process ASGI rate-limiting to protect backend databases and APIs from resource exhaustion, keeping legitimate response times stable.',
   },
   {
     number: 6,
@@ -105,9 +96,9 @@ const DEMO_STEPS: StepInfo[] = [
     title: 'Service Stabilization & Recovery',
     subtitle: 'Threat subsided, traffic normalized, response latencies stabilized, and health restored.',
     workflowStage: 'RECOVER',
-    expectedOutcome: 'HTTP error rate drops to 0%, latency returns to baseline, services report HEALTHY.',
+    expectedOutcome: 'HTTP error rate drops to 0%, latency returns to baseline (<25ms), Incident marked RESOLVED.',
     explanation:
-      'Following automated mitigation and load leveling, backend response times settle. CloudPulse probes confirm zero-error operation and verifies end-to-end recovery without service interruption.',
+      'Following automated rate-limiting mitigation, backend response times settle. CloudPulse probes confirm zero-error operation and verifies end-to-end recovery without service interruption.',
   },
   {
     number: 7,
@@ -116,9 +107,9 @@ const DEMO_STEPS: StepInfo[] = [
     title: 'Executive Faculty Demonstration Report',
     subtitle: 'Comprehensive audit trail, telemetry summary, and evidence verification for faculty review.',
     workflowStage: 'REPORT',
-    expectedOutcome: 'Full summary of peak traffic, mitigation actions, scaling events, and CSV/PDF export.',
+    expectedOutcome: 'Full executive report answers all 5 faculty questions, confirming protection and recovery.',
     explanation:
-      'The entire incident lifecycle is recorded into process-local audit memory, demonstrating full observability, automated protection, compliance readiness, and measurable infrastructure resilience.',
+      'The entire incident lifecycle is recorded into process-local audit memory, demonstrating full observability, explainable classification, automated edge protection, and measurable resilience.',
   },
 ];
 
@@ -129,24 +120,27 @@ export const FacultyDemoModal: React.FC = () => {
     facultyDemoStep,
     setFacultyDemoStep,
     overview,
-    simulator,
     demoStatus,
+    shieldStatus,
     startFacultyDemo,
     pauseFacultyDemo,
     resumeFacultyDemo,
     stopFacultyDemo,
     resetFacultyDemo,
+    runDemoStep,
     addToast,
-    addSecurityEvent,
     refreshData,
     setActiveTab,
   } = useApp();
 
   const [isRunningStep, setIsRunningStep] = useState(false);
-  const [demoLog, setDemoLog] = useState<string[]>([
-    'Demo controller initialized in Website Protection mode.',
-    'System ready: website demo.cloudpulse.local attached.',
-  ]);
+
+  // Sync active step when autonomous engine is running
+  useEffect(() => {
+    if (demoStatus?.is_running && demoStatus.current_stage) {
+      setFacultyDemoStep(demoStatus.current_stage);
+    }
+  }, [demoStatus?.is_running, demoStatus?.current_stage, setFacultyDemoStep]);
 
   const currentStep = DEMO_STEPS.find((s) => s.number === facultyDemoStep) || DEMO_STEPS[0];
 
@@ -162,152 +156,24 @@ export const FacultyDemoModal: React.FC = () => {
     }
   };
 
-  const runStepAction = async () => {
+  const handleExecuteCurrentStep = async () => {
     setIsRunningStep(true);
     try {
-      if (facultyDemoStep === 1) {
-        // Normal baseline
-        if (simulator?.is_running) {
-          await api.stopSimulator();
-        }
-        addSecurityEvent({
-          type: 'baseline_normal',
-          severity: 'info',
-          title: 'Demo Step 1: Normal Website Baseline Verified',
-          description: 'Website availability 99.98% operational with steady low-latency requests.',
-          source: 'Faculty Demo Controller',
-        });
-        setDemoLog((prev) => [
-          `[${new Date().toLocaleTimeString()}] Normal baseline verified: website healthy, 2 replicas.`,
-          ...prev,
-        ]);
-        addToast('Step 1 verified: Normal traffic running.', 'success');
-      } else if (facultyDemoStep === 2) {
-        // Legitimate traffic spike
-        if (!simulator?.is_running) {
-          await api.startSimulator({
-            pattern: 'spike',
-            virtual_users: 4,
-            intensity: 'medium',
-            duration_seconds: 20,
-            ramp_up_seconds: 3,
-            max_requests: 200,
-            target_service: 'cloudpulse-test-service',
-            safe_simulation_mode: true,
-          });
-        }
-        addSecurityEvent({
-          type: 'traffic_spike',
-          severity: 'warning',
-          title: 'Demo Step 2: Inbound Traffic Surge Initiated',
-          description: 'Simulating 4 concurrent users dispatching controlled traffic to test route.',
-          source: 'Traffic Simulator',
-        });
-        setDemoLog((prev) => [
-          `[${new Date().toLocaleTimeString()}] Traffic surge triggered: incoming requests rising.`,
-          ...prev,
-        ]);
-        addToast('Step 2: Traffic surge active!', 'info');
-      } else if (facultyDemoStep === 3) {
-        // Suspicious traffic / burst
-        if (!simulator?.is_running) {
-          await api.startSimulator({
-            pattern: 'burst',
-            virtual_users: 6,
-            intensity: 'high',
-            duration_seconds: 15,
-            ramp_up_seconds: 1,
-            max_requests: 300,
-            target_service: 'cloudpulse-test-service',
-            safe_simulation_mode: true,
-          });
-        }
-        addSecurityEvent({
-          type: 'threat_detected',
-          severity: 'critical',
-          title: 'Demo Step 3: Abnormal Burst Pattern Detected',
-          description: 'High-frequency burst rate exceeds 15 req/s baseline tolerance threshold.',
-          source: 'Threat Detection Engine',
-        });
-        setDemoLog((prev) => [
-          `[${new Date().toLocaleTimeString()}] Threat Detected: Burst request rate exceeded warning threshold!`,
-          ...prev,
-        ]);
-        addToast('Step 3: Abnormal traffic detected by Threat Engine!', 'error');
-      } else if (facultyDemoStep === 4) {
-        // Alert generation
-        addSecurityEvent({
-          type: 'alert_fired',
-          severity: 'critical',
-          title: 'Demo Step 4: Critical Security Alert ALT-CRIT-99 Fired',
-          description: 'Automated alert notification dispatched to on-call SOC operators.',
-          source: 'Alert Manager',
-        });
-        setDemoLog((prev) => [
-          `[${new Date().toLocaleTimeString()}] Alert ALT-CRIT-99 fired: notification posted to header and event log.`,
-          ...prev,
-        ]);
-        addToast('Step 4: Alert ALT-CRIT-99 generated & dispatched.', 'info');
-      } else if (facultyDemoStep === 5) {
-        // Protection & scaling
-        addSecurityEvent({
-          type: 'mitigation_active',
-          severity: 'success',
-          title: 'Demo Step 5: Rate Limiting & HPA Scaling Activated',
-          description: 'Edge filter throttling applied (20 req/s cap). Autoscaler scaling pods 2 -> 4.',
-          source: 'CloudPulse Shield & HPA',
-        });
-        setDemoLog((prev) => [
-          `[${new Date().toLocaleTimeString()}] Mitigation active: Rate limiting applied & simulated HPA scaled to 4 replicas.`,
-          ...prev,
-        ]);
-        addToast('Step 5: Mitigation engaged and auto-scaling triggered!', 'success');
-      } else if (facultyDemoStep === 6) {
-        // Recovery
-        if (simulator?.is_running) {
-          await api.stopSimulator();
-        }
-        addSecurityEvent({
-          type: 'recovered',
-          severity: 'success',
-          title: 'Demo Step 6: System Stabilized & Fully Recovered',
-          description: 'Latencies returned to normal baseline; all endpoints responding with HTTP 200.',
-          source: 'Health Prober',
-        });
-        setDemoLog((prev) => [
-          `[${new Date().toLocaleTimeString()}] Service recovery complete: error rate 0%, latency nominal.`,
-          ...prev,
-        ]);
-        addToast('Step 6: Service successfully stabilized and recovered!', 'success');
-      } else if (facultyDemoStep === 7) {
-        // Final report
-        setDemoLog((prev) => [
-          `[${new Date().toLocaleTimeString()}] Final Faculty Report generated and ready for review.`,
-          ...prev,
-        ]);
-        addToast('Step 7: Demonstration complete! Report ready.', 'success');
-      }
+      await runDemoStep(currentStep.number);
       await refreshData();
     } catch (err: any) {
-      addToast(err?.message || 'Action executed.', 'info');
+      addToast(err?.message || 'Error executing step action.', 'error');
     } finally {
       setIsRunningStep(false);
     }
   };
 
-  const resetEntireDemo = async () => {
+  const handleReset = async () => {
     try {
-      if (simulator?.is_running) {
-        await api.stopSimulator();
-      }
+      await resetFacultyDemo();
       setFacultyDemoStep(1);
-      setDemoLog([
-        `[${new Date().toLocaleTimeString()}] Demo reset to initial baseline state.`,
-      ]);
-      addToast('Demo state reset to Step 1.', 'info');
-      await refreshData();
-    } catch (e) {
-      setFacultyDemoStep(1);
+    } catch (e: any) {
+      addToast(e?.message || 'Reset complete.', 'info');
     }
   };
 
@@ -328,30 +194,90 @@ export const FacultyDemoModal: React.FC = () => {
                   Interactive Evaluation Mode
                 </span>
                 <span className="rounded-full bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 text-[10px] font-mono text-cyan-300">
-                  Major Project Demo
+                  Faculty Demonstration
                 </span>
               </div>
               <h2 className="text-base font-bold text-slate-100">
-                CloudPulse End-to-End Website Protection Demonstration
+                CloudPulse End-to-End Website Traffic Protection &amp; Recovery
               </h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={resetEntireDemo}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-200/80 hover:bg-surface-200 text-xs font-mono text-slate-300 transition-colors"
-              title="Reset Demo to Step 1"
+              onClick={handleReset}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-200/80 hover:bg-surface-200 text-xs font-mono text-slate-300 transition-colors cursor-pointer"
+              title="Reset Demo to Baseline"
             >
               <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
               <span>Reset</span>
             </button>
             <button
               onClick={() => setIsFacultyDemoOpen(false)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surface-200 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surface-200 transition-colors cursor-pointer"
               aria-label="Close demo"
             >
               <X className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+
+        {/* Autonomous Engine Orchestration Bar */}
+        <div className="px-6 py-2.5 bg-[#0b101c] border-b border-border/70 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-3">
+            <span className="text-slate-400 font-semibold">Autonomous Demo:</span>
+            {!demoStatus?.is_running ? (
+              <button
+                onClick={startFacultyDemo}
+                className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold flex items-center gap-1.5 transition-all shadow-glow-cyan cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Start Full Auto Run (38s)</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                {demoStatus.is_paused ? (
+                  <button
+                    onClick={resumeFacultyDemo}
+                    className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Resume</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={pauseFacultyDemo}
+                    className="px-3 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Pause className="w-3.5 h-3.5" />
+                    <span>Pause</span>
+                  </button>
+                )}
+                <button
+                  onClick={stopFacultyDemo}
+                  className="px-3 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/30 flex items-center gap-1 cursor-pointer"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                  <span>Stop</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 text-slate-400 text-[11px]">
+            {demoStatus?.is_running && (
+              <>
+                <span className="text-cyan-300 font-bold">
+                  Stage {demoStatus.current_stage}/7: {demoStatus.stage_name}
+                </span>
+                <span>•</span>
+                <span>Progress: {demoStatus.progress_percent}%</span>
+              </>
+            )}
+            {!demoStatus?.is_running && (
+              <span className="text-slate-400">
+                Mode: Interactive Manual Walkthrough or 1-Click Auto Run
+              </span>
+            )}
           </div>
         </div>
 
@@ -365,7 +291,7 @@ export const FacultyDemoModal: React.FC = () => {
                 <button
                   key={step.id}
                   onClick={() => setFacultyDemoStep(step.number)}
-                  className={`flex-1 flex flex-col items-start p-2 rounded-lg border transition-all text-left ${
+                  className={`flex-1 flex flex-col items-start p-2 rounded-lg border transition-all text-left cursor-pointer ${
                     isCurrent
                       ? 'bg-cyan-500/15 border-cyan-500/50 text-cyan-200 shadow-sm'
                       : isPast
@@ -419,12 +345,16 @@ export const FacultyDemoModal: React.FC = () => {
               {/* Action Button for Current Step */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={runStepAction}
-                  disabled={isRunningStep}
+                  onClick={handleExecuteCurrentStep}
+                  disabled={isRunningStep || demoStatus?.is_running}
                   className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs font-mono flex items-center gap-2 transition-all shadow-glow-cyan disabled:opacity-50 cursor-pointer"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>{isRunningStep ? 'Executing...' : `Execute Step ${currentStep.number} Action`}</span>
+                  <span>
+                    {isRunningStep
+                      ? 'Executing...'
+                      : `Execute Step ${currentStep.number} Action`}
+                  </span>
                 </button>
               </div>
             </div>
@@ -484,16 +414,20 @@ export const FacultyDemoModal: React.FC = () => {
               <span className="text-[10px] text-slate-400 font-mono">Measured via psutil</span>
             </div>
 
+            {/* CloudPulse Shield Rate-Limiter Status (Replacing Pod Replicas) */}
             <div className="p-3.5 rounded-xl bg-surface-100/90 border border-border">
-              <span className="text-[10px] font-mono uppercase text-slate-400">Active Web Pods</span>
+              <span className="text-[10px] font-mono uppercase text-slate-400">CloudPulse Shield</span>
               <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-xl font-bold font-mono text-emerald-300">
-                  {facultyDemoStep >= 5 ? '4' : '2'}
+                <span
+                  className={`text-xl font-bold font-mono ${
+                    facultyDemoStep >= 5 ? 'text-emerald-400' : 'text-slate-300'
+                  }`}
+                >
+                  {facultyDemoStep >= 5 ? 'ENFORCED' : 'STANDBY'}
                 </span>
-                <span className="text-[11px] text-slate-400 font-mono">replicas</span>
               </div>
               <span className="text-[10px] text-slate-400 font-mono">
-                {facultyDemoStep >= 5 ? 'Scaled via HPA' : 'Baseline pool'}
+                {facultyDemoStep >= 5 ? '20 req/s Ingress Cap' : 'Monitoring Envelope'}
               </span>
             </div>
           </div>
@@ -510,21 +444,21 @@ export const FacultyDemoModal: React.FC = () => {
               <p className="text-xs text-slate-300">
                 The demonstration proved that CloudPulse successfully performed the full operations center workflow:
                 <span className="font-mono text-cyan-300 font-semibold">
-                  {' '}MONITOR → DETECT → ALERT → ANALYZE → MITIGATE → SCALE → RECOVER
+                  {' '}MONITOR → DETECT → ALERT → ANALYZE → MITIGATE → RECOVER → REPORT
                 </span>.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs font-mono">
                 <div className="p-2.5 rounded-lg bg-surface-200/80 border border-border">
-                  <span className="text-slate-400 block text-[10px]">THREAT RESPONSE</span>
-                  <span className="text-emerald-400 font-semibold">100% Mitigated</span>
+                  <span className="text-slate-400 block text-[10px]">THREAT MITIGATION</span>
+                  <span className="text-emerald-400 font-semibold">100% Mitigated (HTTP 429)</span>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-200/80 border border-border">
                   <span className="text-slate-400 block text-[10px]">WEBSITE AVAILABILITY</span>
                   <span className="text-emerald-400 font-semibold">99.98% Maintained</span>
                 </div>
                 <div className="p-2.5 rounded-lg bg-surface-200/80 border border-border">
-                  <span className="text-slate-400 block text-[10px]">HPA SCALE TIME</span>
-                  <span className="text-cyan-400 font-semibold">&lt; 15s Latency</span>
+                  <span className="text-slate-400 block text-[10px]">SHIELD ENFORCEMENT</span>
+                  <span className="text-cyan-400 font-semibold">Real In-process ASGI Cap</span>
                 </div>
               </div>
             </div>
@@ -535,13 +469,20 @@ export const FacultyDemoModal: React.FC = () => {
             <span className="text-xs font-mono font-semibold text-slate-300 uppercase tracking-wider block mb-2">
               Demonstration Execution Log
             </span>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto font-mono text-[11px] text-slate-400">
-              {demoLog.map((log, idx) => (
-                <div key={idx} className="flex items-start gap-2">
-                  <span className="text-cyan-400">›</span>
-                  <span>{log}</span>
+            <div className="space-y-1.5 max-h-36 overflow-y-auto font-mono text-[11px] text-slate-400">
+              {demoStatus?.logs && demoStatus.logs.length > 0 ? (
+                demoStatus.logs.map((log, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className="text-cyan-400 shrink-0">[{log.timestamp}]</span>
+                    <span className="text-slate-300 shrink-0 font-semibold">{log.stage}:</span>
+                    <span className="text-slate-400">{log.message}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-500">
+                  Ready. Click &quot;Start Full Auto Run&quot; or execute any individual step above.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -551,7 +492,7 @@ export const FacultyDemoModal: React.FC = () => {
           <button
             onClick={handlePrev}
             disabled={facultyDemoStep === 1}
-            className="px-3.5 py-1.5 rounded-lg border border-border bg-surface-200 text-xs font-mono text-slate-300 hover:text-slate-100 disabled:opacity-40 disabled:hover:text-slate-300 transition-colors"
+            className="px-3.5 py-1.5 rounded-lg border border-border bg-surface-200 text-xs font-mono text-slate-300 hover:text-slate-100 disabled:opacity-40 disabled:hover:text-slate-300 transition-colors cursor-pointer"
           >
             ← Previous Step
           </button>
@@ -564,7 +505,7 @@ export const FacultyDemoModal: React.FC = () => {
           {facultyDemoStep < DEMO_STEPS.length ? (
             <button
               onClick={handleNext}
-              className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors shadow-glow-cyan"
+              className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors shadow-glow-cyan cursor-pointer"
             >
               <span>Next Step</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -575,7 +516,7 @@ export const FacultyDemoModal: React.FC = () => {
                 setIsFacultyDemoOpen(false);
                 setActiveTab('overview');
               }}
-              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors shadow-glow-emerald"
+              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors shadow-glow-emerald cursor-pointer"
             >
               <span>Finish &amp; View Operations Center</span>
               <CheckCircle2 className="w-3.5 h-3.5" />

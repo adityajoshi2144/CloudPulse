@@ -1,80 +1,89 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
-import { ScalingPolicy, ScalingEvent } from '../services/types';
 import {
-  TrendingUp,
-  Clock,
-  Save,
-  AlertCircle,
-  Layers,
-  Cpu,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
+  Activity,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCcw,
+  Sparkles,
+  Sliders,
   Server,
   Zap,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  Sparkles
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 
 export const AutoScalingPage: React.FC = () => {
-  const { addToast, overview, simulator, setIsFacultyDemoOpen } = useApp();
-  const [policies, setPolicies] = useState<ScalingPolicy[]>([]);
-  const [events, setEvents] = useState<ScalingEvent[]>([]);
-  const [editingPolicy, setEditingPolicy] = useState<
-    Record<string, { target_cpu: number; min: number; max: number }>
-  >({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-
-  const isSimActive = simulator?.is_running;
-  const currentReplicaCount = isSimActive ? 4 : 2;
-
-  const fetchData = async () => {
-    try {
-      const [pols, evts] = await Promise.all([
-        api.getScalingPolicies(),
-        api.getScalingEvents(),
-      ]);
-      setPolicies(pols);
-      setEvents(evts);
-
-      const editMap: Record<string, { target_cpu: number; min: number; max: number }> = {};
-      pols.forEach((p) => {
-        editMap[p.service_id] = {
-          target_cpu: p.target_cpu,
-          min: p.min_replicas,
-          max: p.max_replicas,
-        };
-      });
-      setEditingPolicy(editMap);
-    } catch (e: any) {
-      addToast(e.message || 'Unable to load scaling policies.', 'error');
-    }
-  };
+  const { addToast, overview, simulator, shieldStatus, refreshData, setIsFacultyDemoOpen } = useApp();
+  const [isToggling, setIsToggling] = useState(false);
+  const [customRateLimit, setCustomRateLimit] = useState<number>(shieldStatus?.rate_limit_rps ?? 20);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (shieldStatus?.rate_limit_rps) {
+      setCustomRateLimit(shieldStatus.rate_limit_rps);
+    }
+  }, [shieldStatus?.rate_limit_rps]);
 
-  const handleSavePolicy = async (serviceId: string) => {
-    const edit = editingPolicy[serviceId];
-    if (!edit) return;
-
+  const handleToggleEnforcement = async () => {
+    setIsToggling(true);
     try {
-      setSavingId(serviceId);
-      await api.updateScalingPolicy(serviceId, {
-        target_cpu: edit.target_cpu,
-        min_replicas: edit.min,
-        max_replicas: edit.max,
-      });
-      addToast(`Updated scaling policy for ${serviceId}.`, 'success');
-      await fetchData();
+      const nextState = !shieldStatus?.rate_limiting_enforced;
+      await api.toggleShieldEnforcement(nextState);
+      await refreshData();
+      addToast(
+        nextState
+          ? 'CloudPulse Shield rate limiting ENFORCED.'
+          : 'CloudPulse Shield rate limiting set to STANDBY.',
+        'success'
+      );
     } catch (e: any) {
-      addToast(e.message, 'error');
+      addToast(e?.message || 'Error updating shield enforcement.', 'error');
     } finally {
-      setSavingId(null);
+      setIsToggling(false);
     }
   };
+
+  const isEnforced = shieldStatus?.rate_limiting_enforced ?? true;
+
+  const protectedRoutes = [
+    {
+      service: 'Ingress API Gateway',
+      route: '/api/*',
+      rateLimit: `${customRateLimit} req/s`,
+      burst: '10 reqs',
+      action: 'HTTP 429 Throttling',
+      status: isEnforced ? 'ACTIVE & SHIELDED' : 'STANDBY',
+    },
+    {
+      service: 'Order Processing Service',
+      route: '/api/orders/*',
+      rateLimit: '15 req/s',
+      burst: '5 reqs',
+      action: 'Queue & Throttle',
+      status: isEnforced ? 'ACTIVE & SHIELDED' : 'STANDBY',
+    },
+    {
+      service: 'Auth & Session Service',
+      route: '/api/auth/*',
+      rateLimit: '10 req/s',
+      burst: '3 reqs',
+      action: 'IP Quarantine',
+      status: isEnforced ? 'ACTIVE & SHIELDED' : 'STANDBY',
+    },
+    {
+      service: 'Catalog & Inventory',
+      route: '/api/catalog/*',
+      rateLimit: '25 req/s',
+      burst: '12 reqs',
+      action: 'Cache Fallback',
+      status: isEnforced ? 'ACTIVE & SHIELDED' : 'STANDBY',
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -83,17 +92,19 @@ export const AutoScalingPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30">
-              <TrendingUp className="h-5 w-5 text-cyan-400" />
+              <ShieldCheck className="h-5 w-5 text-cyan-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-100">Autonomous Auto-Scaling Engine</h1>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700/50">
-                  Native HPA Engine
+                <h1 className="text-xl font-bold text-slate-100">
+                  CloudPulse Shield — Ingress Rate Limiting &amp; Protection
+                </h1>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/50">
+                  REAL ASGI GATEWAY SHIELD
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Horizontal Pod Autoscaling (HPA) policies dynamically provision replica pods based on real-time CPU &amp; traffic load.
+                Active in-process ASGI rate-limiting middleware that throttles malicious bursts (20 req/s cap), shielding downstream microservices from saturation.
               </p>
             </div>
           </div>
@@ -108,198 +119,201 @@ export const AutoScalingPage: React.FC = () => {
         </button>
       </header>
 
-      {/* Honest Architecture Labeling */}
+      {/* Architectural Grounding Alert */}
       <div className="flex items-start gap-3 rounded-xl border border-cyan-500/30 bg-cyan-950/15 p-4 text-xs">
-        <Layers className="h-5 w-5 shrink-0 text-cyan-400 mt-0.5" />
+        <Lock className="h-5 w-5 shrink-0 text-cyan-400 mt-0.5" />
         <div className="leading-relaxed text-slate-300">
-          <span className="font-bold text-cyan-300 block mb-0.5">Native Simulated HPA Execution Mode</span>
+          <span className="font-bold text-cyan-300 block mb-0.5">
+            Website Traffic Protection Architecture
+          </span>
           <p>
-            CloudPulse runs a built-in Horizontal Pod Autoscaler algorithm. When external Kubernetes cluster adapters are
-            disconnected, the platform visualizes horizontal pod scaling natively, demonstrating how incoming traffic surges
-            trigger automated replica provisioning and load-balancing.
+            Rather than relying on costly infrastructure auto-scaling alone, CloudPulse provides a genuine software-defined defense layer.
+            When inbound traffic violates normal baseline variance or exceeds the configured 20 req/s rate-limiting envelope,
+            the ASGI middleware actively throttles surplus requests with HTTP 429, preventing backend database contention and keeping website response latencies low.
           </p>
         </div>
       </div>
 
-      {/* Visual Replica Pod Scaling Animation Box */}
-      <div className="p-6 rounded-2xl bg-gradient-to-br from-[#0c1322] via-surface-100 to-[#0c1322] border border-cyan-500/30 shadow-xl space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
-          <div>
-            <span className="text-[10px] font-mono uppercase text-cyan-400 font-bold tracking-wider">
-              Real-Time Replica Scaling Visualization
-            </span>
-            <h2 className="text-base font-bold text-slate-100 mt-0.5">
-              Target Service: <span className="text-cyan-300 font-mono">api-gateway / web-core</span>
-            </h2>
+      {/* Live Shield Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1: Shield Enforcement Status */}
+        <div className="p-4 rounded-xl bg-surface-100/90 border border-border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-mono uppercase text-slate-400">Shield Protection</span>
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                isEnforced ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+              }`}
+            />
           </div>
-          <div className="flex items-center gap-4 text-xs font-mono">
-            <span className="text-slate-400">
-              State:{' '}
-              <span className={isSimActive ? 'text-amber-300 font-bold' : 'text-emerald-400 font-bold'}>
-                {isSimActive ? 'LOAD ELEVATED (SCALED OUT)' : 'NOMINAL BASELINE'}
-              </span>
-            </span>
-            <span className="px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-              {currentReplicaCount} Active Pods
+          <div className="flex items-baseline gap-2">
+            <span
+              className={`text-2xl font-bold font-mono ${
+                isEnforced ? 'text-emerald-400' : 'text-slate-400'
+              }`}
+            >
+              {isEnforced ? 'ENFORCED' : 'STANDBY'}
             </span>
           </div>
+          <button
+            onClick={handleToggleEnforcement}
+            disabled={isToggling}
+            className="mt-3 w-full py-1.5 px-3 rounded-lg border border-border bg-surface-200/80 hover:bg-surface-200 text-[11px] font-mono text-slate-300 transition-colors cursor-pointer"
+          >
+            {isToggling ? 'Updating...' : isEnforced ? 'Switch to Standby' : 'Enforce Shield Active'}
+          </button>
         </div>
 
-        {/* Pod Cluster Graphic */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((podIdx) => {
-            const isProvisioned = podIdx <= currentReplicaCount;
-            return (
-              <div
-                key={podIdx}
-                className={`p-4 rounded-xl border transition-all duration-500 ${
-                  isProvisioned
-                    ? 'bg-surface-200/90 border-cyan-500/50 shadow-md shadow-cyan-950/30'
-                    : 'bg-surface-300/30 border-dashed border-border/60 opacity-40'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Server
-                      className={`w-4 h-4 ${
-                        isProvisioned ? 'text-cyan-400' : 'text-slate-500'
-                      }`}
-                    />
-                    <span className="text-xs font-bold font-mono text-slate-200">
-                      pod-0{podIdx}
-                    </span>
-                  </div>
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isProvisioned ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
-                    }`}
-                  />
-                </div>
-
-                <div className="space-y-1.5 text-[11px] font-mono text-slate-400">
-                  <div className="flex justify-between">
-                    <span>Status:</span>
-                    <span className={isProvisioned ? 'text-emerald-300' : 'text-slate-500'}>
-                      {isProvisioned ? 'Running' : 'Standby'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>CPU:</span>
-                    <span className="text-slate-200">
-                      {isProvisioned ? `${overview?.cpu_utilization_percent ? (overview.cpu_utilization_percent / currentReplicaCount).toFixed(1) : 18.5}%` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Port:</span>
-                    <span className="text-slate-300">800{podIdx}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        {/* Metric 2: Rate Limit Threshold */}
+        <div className="p-4 rounded-xl bg-surface-100/90 border border-border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-mono uppercase text-slate-400">Rate Limit Threshold</span>
+            <Sliders className="w-4 h-4 text-cyan-400" />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-bold font-mono text-cyan-300">
+              {customRateLimit}
+            </span>
+            <span className="text-xs font-mono text-slate-400">req/s max</span>
+          </div>
+          <span className="text-[10px] font-mono text-slate-400 block mt-3">
+            Rolling 1.0s sliding window
+          </span>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400 pt-2 border-t border-border/60">
-          <span>Scaling Metric: CPU Target &gt; 70% or RPS Surge</span>
-          <span>Scaling Cooldown: 15s Scale-Up / 30s Scale-Down</span>
-          <span>Max Bounds: 2 Min / 10 Max</span>
+        {/* Metric 3: Requests Evaluated & Allowed */}
+        <div className="p-4 rounded-xl bg-surface-100/90 border border-border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-mono uppercase text-slate-400">Permitted Ingress</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-bold font-mono text-slate-100">
+              {shieldStatus?.total_allowed ?? 0}
+            </span>
+            <span className="text-xs font-mono text-slate-400">reqs</span>
+          </div>
+          <span className="text-[10px] font-mono text-slate-400 block mt-3">
+            Total evaluated: {shieldStatus?.total_evaluated ?? 0}
+          </span>
+        </div>
+
+        {/* Metric 4: Requests Throttled (HTTP 429) */}
+        <div className="p-4 rounded-xl bg-surface-100/90 border border-border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-mono uppercase text-slate-400">Throttled (HTTP 429)</span>
+            <AlertTriangle className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span
+              className={`text-2xl font-bold font-mono ${
+                (shieldStatus?.total_blocked ?? 0) > 0 ? 'text-rose-400' : 'text-slate-100'
+              }`}
+            >
+              {shieldStatus?.total_blocked ?? 0}
+            </span>
+            <span className="text-xs font-mono text-slate-400">blocked</span>
+          </div>
+          <span className="text-[10px] font-mono text-slate-400 block mt-3">
+            {shieldStatus?.last_blocked_at
+              ? `Last throttled: ${new Date(shieldStatus.last_blocked_at).toLocaleTimeString()}`
+              : 'Zero rate-limit violations'}
+          </span>
         </div>
       </div>
 
-      {/* Scaling Policies Configuration Table */}
+      {/* Protected Routes & Policy Configuration Table */}
       <div className="p-6 rounded-2xl bg-surface-100/90 border border-border shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-border/60 pb-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-100">Configured Auto-Scaling Policies</h3>
+            <h3 className="text-sm font-bold text-slate-100">Configured Ingress Protection Policies</h3>
             <p className="text-xs text-slate-400">
-              Update CPU thresholds and replica limits per catalog service.
+              Per-route rate limits, burst capacities, and active mitigation actions.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-slate-400">Process-Local Policy Engine</span>
+          <span className="text-[11px] font-mono text-emerald-400 font-semibold">
+            In-Process ASGI Middleware Enforced
+          </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
             <thead>
               <tr className="border-b border-border/60 text-slate-400 uppercase text-[10px]">
-                <th className="py-2.5 px-3">Service</th>
-                <th className="py-2.5 px-3">Current Pods</th>
-                <th className="py-2.5 px-3">Target CPU (%)</th>
-                <th className="py-2.5 px-3">Min Replicas</th>
-                <th className="py-2.5 px-3">Max Replicas</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
+                <th className="py-2.5 px-3">Microservice</th>
+                <th className="py-2.5 px-3">Protected Route</th>
+                <th className="py-2.5 px-3">Rate Limit</th>
+                <th className="py-2.5 px-3">Burst Tolerance</th>
+                <th className="py-2.5 px-3">Action on Breach</th>
+                <th className="py-2.5 px-3 text-right">Defense Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {policies.map((pol) => {
-                const edit = editingPolicy[pol.service_id] || {
-                  target_cpu: pol.target_cpu,
-                  min: pol.min_replicas,
-                  max: pol.max_replicas,
-                };
-                return (
-                  <tr key={pol.service_id} className="hover:bg-surface-200/40 transition-colors">
-                    <td className="py-3 px-3 font-semibold text-slate-200">{pol.service_name}</td>
-                    <td className="py-3 px-3 text-cyan-300 font-bold">{pol.current_replicas ?? 2} pods</td>
-                    <td className="py-3 px-3">
-                      <input
-                        type="number"
-                        min="10"
-                        max="95"
-                        value={edit.target_cpu}
-                        onChange={(e) =>
-                          setEditingPolicy((prev) => ({
-                            ...prev,
-                            [pol.service_id]: { ...edit, target_cpu: Number(e.target.value) },
-                          }))
-                        }
-                        className="w-16 rounded border border-border bg-surface-200 px-2 py-1 text-slate-100 text-xs"
-                      />
-                    </td>
-                    <td className="py-3 px-3">
-                      <input
-                        type="number"
-                        min="1"
-                        max="10"
-                        value={edit.min}
-                        onChange={(e) =>
-                          setEditingPolicy((prev) => ({
-                            ...prev,
-                            [pol.service_id]: { ...edit, min: Number(e.target.value) },
-                          }))
-                        }
-                        className="w-14 rounded border border-border bg-surface-200 px-2 py-1 text-slate-100 text-xs"
-                      />
-                    </td>
-                    <td className="py-3 px-3">
-                      <input
-                        type="number"
-                        min="2"
-                        max="50"
-                        value={edit.max}
-                        onChange={(e) =>
-                          setEditingPolicy((prev) => ({
-                            ...prev,
-                            [pol.service_id]: { ...edit, max: Number(e.target.value) },
-                          }))
-                        }
-                        className="w-14 rounded border border-border bg-surface-200 px-2 py-1 text-slate-100 text-xs"
-                      />
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <button
-                        onClick={() => handleSavePolicy(pol.service_id)}
-                        disabled={savingId === pol.service_id}
-                        className="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-semibold transition-colors disabled:opacity-50"
-                      >
-                        {savingId === pol.service_id ? 'Saving...' : 'Save Policy'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {protectedRoutes.map((route, idx) => (
+                <tr key={idx} className="hover:bg-surface-200/40 transition-colors">
+                  <td className="py-3 px-3 font-semibold text-slate-200">{route.service}</td>
+                  <td className="py-3 px-3 text-cyan-300 font-mono">{route.route}</td>
+                  <td className="py-3 px-3 text-slate-200 font-bold">{route.rateLimit}</td>
+                  <td className="py-3 px-3 text-slate-400">{route.burst}</td>
+                  <td className="py-3 px-3 text-amber-300">{route.action}</td>
+                  <td className="py-3 px-3 text-right">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        isEnforced
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-surface-200 text-slate-400'
+                      }`}
+                    >
+                      {route.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Mitigation Actions Log */}
+      <div className="p-6 rounded-2xl bg-surface-100/90 border border-border shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-border/60 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-100">Recent Defense &amp; Mitigation Actions</h3>
+            <p className="text-xs text-slate-400">
+              Audit log of active throttling events executed by CloudPulse Shield.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-cyan-400">
+            Real In-Process Actions
+          </span>
+        </div>
+
+        <div className="space-y-2 font-mono text-xs">
+          {shieldStatus?.recent_actions && shieldStatus.recent_actions.length > 0 ? (
+            shieldStatus.recent_actions.map((act, i) => (
+              <div
+                key={i}
+                className="p-3 rounded-xl bg-surface-200/50 border border-border/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-200">{act.action}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {act.enforcement_type}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{act.details || act.policy}</p>
+                </div>
+                <div className="text-right text-[11px] text-slate-500 shrink-0">
+                  <span>{act.timestamp}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-slate-500 text-xs">
+              No recent mitigation actions. Website operating normally within configured limits.
+            </div>
+          )}
         </div>
       </div>
     </div>

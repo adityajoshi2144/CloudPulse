@@ -67,6 +67,14 @@ export const ReportsPage: React.FC = () => {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-sm font-semibold capitalize text-slate-100">{report.scenario.replace(/_/g, ' ')} scenario</h2>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                    (report as any).final_verdict === 'CRITICAL RISK' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' :
+                    (report as any).final_verdict === 'HIGH RISK' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+                    (report as any).final_verdict === 'MEDIUM RISK' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' :
+                    'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  }`}>
+                    {(report as any).final_verdict || 'LOW RISK'}
+                  </span>
                   <span className="rounded-full border border-border px-2 py-0.5 text-[10px] capitalize text-slate-400">{report.status.replace(/_/g, ' ')}</span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">{new Date(report.created_at).toLocaleString()} · {report.target_service}</p>

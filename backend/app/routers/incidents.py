@@ -11,7 +11,7 @@ async def get_incidents():
 async def trigger_pod_failure(service_id: str = "order-service"):
     raise HTTPException(
         status_code=501,
-        detail="Pod failure injection is unavailable. Use the bounded local test-target failure scenario in the simulator.",
+        detail="Service failure injection is unavailable. Use the bounded local test-target failure scenario in the simulator.",
     )
 
 @router.post("/recover")

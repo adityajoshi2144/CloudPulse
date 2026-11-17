@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 from app.models.entities import AlertThresholdConfig
@@ -47,6 +47,7 @@ alert_thresholds = [
 async def get_alerts():
     # Dynamically inject critical alert if chaos is active or demo stage is alert/mitigation
     dynamic_list = list(active_alerts)
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     if demo_engine.alerts_generated and demo_engine.current_stage in (4, 5):
         dynamic_list.insert(0, {
             "id": "ALT-CRIT-99",
@@ -57,7 +58,7 @@ async def get_alerts():
             "current_value": 24.5,
             "severity": "critical",
             "status": "firing",
-            "triggered_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "triggered_at": now_str,
             "message": "Critical burst flood detected violating ingress rate limit (20 req/s cap)"
         })
     elif telemetry_state.failing_service_id:
@@ -72,26 +73,28 @@ async def get_alerts():
             "current_value": svc.get("error_rate", 14.8),
             "severity": "critical",
             "status": "firing",
-            "triggered_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "triggered_at": now_str,
             "message": f"Critical pod crash and error surge on {s_id}"
         })
     return dynamic_list
 
 @router.post("/{alert_id}/acknowledge")
 async def acknowledge_alert(alert_id: str):
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     for a in active_alerts:
         if a["id"] == alert_id:
             a["status"] = "acknowledged"
-            a["acknowledged_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            a["acknowledged_at"] = now_str
             return {"status": "success", "alert": a}
     return {"status": "ok", "message": "Alert acknowledged"}
 
 @router.post("/{alert_id}/resolve")
 async def resolve_alert(alert_id: str):
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     for a in active_alerts:
         if a["id"] == alert_id:
             a["status"] = "resolved"
-            a["resolved_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            a["resolved_at"] = now_str
             return {"status": "success", "alert": a}
     return {"status": "ok", "message": "Alert marked resolved"}
 

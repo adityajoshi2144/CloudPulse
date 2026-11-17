@@ -101,8 +101,8 @@ When presenting to faculty, orient your presentation around these 5 core answers
 | **1. Is the website safe or at risk?** | **SAFE** (Nominal Baseline & Recovered) | Ingress throughput is 2–4 req/s, P95 latency is <25ms, error rate is 0.0%, and risk score is 12/100 (`LOW RISK`). |
 | **2. What did CloudPulse detect?** | **Traffic Surge & Abnormal Burst Flood** | Differentiated an initial visitor wave from an erratic, high-frequency burst attack pattern violating variance bounds. |
 | **3. Why did it classify this way?** | **Multi-Factor Baseline Deviation** | Pure volume growth with uniform endpoints and 0% errors = `LEGITIMATE TRAFFIC SURGE`. Rapid pulse frequency + elevated errors = `SIMULATED ATTACK TRAFFIC`. |
-| **4. What action was taken?** | **Shield Throttling & Simulated HPA** | CloudPulse Shield enforced a 20 req/s cap via ASGI middleware (HTTP 429), and native HPA scaled replicas from 2 to 4 pods. |
-| **5. Did the website recover?** | **YES** | Error rate dropped to 0.0%, P95 latency normalized, Incident `INC-2026-081` was marked `RESOLVED`, and website health returned to `Healthy`. |
+| **4. What action was taken?** | **CloudPulse Shield Rate-Limiting Filter** | CloudPulse Shield enforced a 20 req/s cap via ASGI gateway middleware, throttling surplus burst requests with HTTP 429. |
+| **5. Did the website recover?** | **YES** | Error rate dropped to 0.0%, P95 latency normalized (<25ms), Incident `INC-2026-081` was marked `RESOLVED`, and website health returned to `Healthy`. |
 
 ---
 
@@ -110,10 +110,16 @@ When presenting to faculty, orient your presentation around these 5 core answers
 
 Open the browser at `http://127.0.0.1:5174`.
 
+### Demonstration Modes Available:
+1. **1-Click Autonomous Demo (38s)**: Click `START FACULTY DEMO` on the Overview banner to run all 7 stages hands-free.
+2. **Interactive Step-by-Step Walkthrough**: Click `Launch Demo Flow Modal` to walk through each stage one by one, explaining the defense principles and clicking `Execute Step Action`.
+
+---
+
 ### Step 1: Introduce CloudPulse & Show Baseline (Stage 1)
-- **What to Click**: The page opens on the **Overview** page. Point to the glowing **"START FACULTY DEMO"** banner.
+- **What to Click**: The page opens on the **Website Protection Center** (Overview page). Point to the glowing **"START FACULTY DEMO"** banner.
 - **What to Say**:
-  > *"Respected faculty, welcome to CloudPulse. CloudPulse is an autonomous Website Traffic Protection and Cloud Operations platform. Instead of confusing operators with dozens of disjointed metric charts, CloudPulse delivers one clear, explainable Security Verdict. Right now, our protected target `demo.cloudpulse.local` is operating under nominal baseline conditions. As you can see on the central Security Verdict Card, the risk is classified as **LOW RISK** with a score of 12/100. Throughput is healthy at ~2 to 4 requests per second, P95 response latency is under 25 milliseconds, and our worker pool has 2 active replicas."*
+  > *"Respected faculty, welcome to CloudPulse. CloudPulse is an autonomous Website Traffic Protection and Cloud Operations platform. Instead of confusing operators with dozens of disjointed metric charts, CloudPulse delivers one clear, explainable Security Verdict. Right now, our protected target `demo.cloudpulse.local` is operating under nominal baseline conditions. As you can see on the central Security Verdict Card, the risk is classified as **LOW RISK** with a score of 12/100. Throughput is healthy at ~2 to 4 requests per second, P95 response latency is under 25 milliseconds, error rate is 0%, and CloudPulse Shield is in standby monitoring mode."*
 - **Visuals on Screen**:
   - Central Verdict Card: Green badge `LOW RISK`, Score `12/100`.
   - Traffic Classification: `NORMAL TRAFFIC`.
@@ -123,22 +129,22 @@ Open the browser at `http://127.0.0.1:5174`.
 ---
 
 ### Step 2: Trigger Legitimate Traffic Surge (Stage 2)
-- **What to Click**: Click the glowing button **`START FACULTY DEMO`**.
+- **What to Click**: Click the glowing button **`START FACULTY DEMO`** (or execute Step 2 in the Modal).
 - **What Happens**: Stage 2 initiates. The simulator dispatches controlled visitor traffic (`pattern: spike`, 4 virtual users) to the local ASGI test route.
 - **What to Say**:
-  > *"Now, we initiate Stage 2: a legitimate visitor surge, simulating a seasonal flash sale or viral product campaign. Notice how the incoming request throughput wave immediately climbs from 2 up to 12 requests per second, and host CPU utilization rises. Crucially, look at the Security Verdict Card: CloudPulse classifies this as **LEGITIMATE TRAFFIC SURGE**. Because error rates remain at 0% and request distribution is uniform, CloudPulse does not falsely sound a panic alarm. High traffic volume alone is not treated as a cyberattack."*
+  > *"Now, we initiate Stage 2: a legitimate visitor surge, simulating a seasonal flash sale or viral product campaign. Notice how incoming throughput climbs from 2 up to 12 requests per second, and host CPU utilization rises. Crucially, look at the Security Verdict Card: CloudPulse classifies this as **LEGITIMATE TRAFFIC SURGE**. Because error rates remain at 0% and request distribution is uniform, CloudPulse does not falsely sound a panic alarm. High traffic volume alone is not treated as a cyberattack."*
 - **Visuals on Screen**:
   - Stage indicator highlights **STAGE 2: DETECT LOAD**.
   - Throughput jumps to 10–14 req/s on the KPI card.
   - Verdict Card displays `LEGITIMATE TRAFFIC SURGE`.
-  - Risk Level remains `LOW RISK` or `MEDIUM RISK` (<50).
+  - Risk Level remains `LOW RISK` (<25/100).
 
 ---
 
 ### Step 3: Trigger Suspicious Burst Traffic (Stage 3)
 - **What Happens**: Stage 3 initiates automatically. The simulator dispatches high-frequency burst traffic (`pattern: burst`, 8 virtual users) exceeding variance thresholds.
 - **What to Say**:
-  > *"Next, in Stage 3, CloudPulse experiences abnormal burst traffic. Notice the erratic pulses on the waveform graph. The anomaly detection engine measures rapid threshold breaches and discontinuous spikes. The Threat Engine immediately flags this as **SIMULATED ATTACK TRAFFIC**, and the Risk Score elevates to **HIGH RISK (74/100)**. The Detection Explanation explicitly informs the operator: 'Abnormal burst traffic flood observed with elevated variance exceeding baseline tolerance envelopes.'"*
+  > *"Next, in Stage 3, CloudPulse experiences abnormal burst traffic. Notice the erratic pulses on the waveform graph. The anomaly detection engine measures rapid threshold breaches and discontinuous spikes. The Threat Engine immediately flags this as **SIMULATED ATTACK TRAFFIC**, and the Risk Score escalates to **HIGH RISK (74/100)**. The Detection Explanation explicitly informs the operator: 'Abnormal burst traffic flood observed with elevated variance exceeding baseline tolerance envelopes.'"*
 - **Visuals on Screen**:
   - Stage indicator highlights **STAGE 3: DETECT ANOMALY**.
   - Verdict Card turns amber/rose: **`HIGH RISK` (Score: 74/100)**.
@@ -158,25 +164,25 @@ Open the browser at `http://127.0.0.1:5174`.
 
 ---
 
-### Step 5: Active Mitigation & Auto-Scaling (Stage 5)
-- **What Happens**: Stage 5 enforces rate-limiting filters on the ingress gateway and executes simulated HPA scaling.
+### Step 5: Active Defense: CloudPulse Shield Rate-Limiting (Stage 5)
+- **What Happens**: Stage 5 enforces rate-limiting filters on the ingress gateway middleware.
 - **What to Say**:
-  > *"Now observe Stage 5: Autonomous Dual-Layer Mitigation. First, CloudPulse Shield engages real in-process rate-limiting on the ingress gateway, capping throughput at 20 requests per second and rejecting excess burst requests with HTTP 429 Too Many Requests. Second, the native Horizontal Pod Autoscaler calculates CPU pressure and dynamically provisions additional replicas, scaling worker pods from 2 to 4 pods. This absorbs the traffic wave while protecting backend databases from saturation."*
+  > *"Now observe Stage 5: Autonomous Active Defense. CloudPulse Shield engages real in-process rate-limiting on the ingress gateway, capping throughput at 20 requests per second and rejecting excess burst requests with HTTP 429 Too Many Requests. Rather than spinning up costly cloud infrastructure that takes minutes and drives up hosting bills, CloudPulse filters malicious bursts at the software gate, protecting origin databases and APIs from resource exhaustion."*
 - **Visuals on Screen**:
-  - Stage indicator highlights **STAGE 5: MITIGATE & SCALE**.
-  - Section 4 shows `[REAL ACTION]` Rate Limiting Shield Enforced.
-  - Section 4 shows `[SIMULATED ACTION]` HPA Scaled Replicas 2 → 4 pods.
-  - Protection Status pill turns green: `ENFORCED`.
+  - Stage indicator highlights **STAGE 5: SHIELD MITIGATION**.
+  - Section 4 shows `[REAL ACTION]` CloudPulse Shield Rate-Limiting Enforced.
+  - Protection Status pill turns green: `ENFORCED (20 req/s cap)`.
 
 ---
 
 ### Step 6: Service Stabilization & Recovery (Stage 6)
 - **What Happens**: The simulator stops, load levels off, latency settles, error rate drops to 0%, and Incident `INC-2026-081` is marked `RESOLVED`.
 - **What to Say**:
-  > *"In Stage 6, the threat has subsided and mitigation takes effect. Traffic returns to baseline envelopes, HTTP error rate settles at 0.00%, and P95 edge latency drops back below 25 milliseconds. The incident is automatically marked RESOLVED, and the website status turns green: HEALTHY. CloudPulse has completed the self-healing cycle."*
+  > *"In Stage 6, the threat has subsided and mitigation takes effect. Traffic returns to baseline envelopes, HTTP error rate settles at 0.00%, and P95 edge latency drops back below 25 milliseconds. Incident `INC-2026-081` is automatically marked RESOLVED, and the website status returns to green: HEALTHY. CloudPulse has completed the self-healing cycle."*
 - **Visuals on Screen**:
   - Stage indicator highlights **STAGE 6: RECOVER**.
-  - Latency returns to nominal baseline.
+  - Latency returns to nominal baseline (<25ms).
+  - Error rate drops to 0.00%.
   - Incident status updates to `RESOLVED`.
 
 ---
@@ -184,9 +190,9 @@ Open the browser at `http://127.0.0.1:5174`.
 ### Step 7: Executive Faculty Demonstration Report (Stage 7)
 - **What Happens**: The comprehensive **Faculty Demonstration Report** appears directly on screen.
 - **What to Say**:
-  > *"Finally, in Stage 7, CloudPulse compiles an executive audit report. It summarizes the initial risk score (12/100) versus final risk score, peak traffic (16.2 req/s), peak CPU (78%), mitigation events, and scaling actions. Most importantly, it gives faculty clean, bulleted answers to the 5 core questions confirming that the website was successfully protected, stabilized, and recovered."*
+  > *"Finally, in Stage 7, CloudPulse compiles an executive audit report. It summarizes the initial risk score (12/100) versus final recovered risk score, peak traffic, peak CPU, and mitigation actions. Most importantly, it gives faculty clean, bulleted answers to the 5 core questions confirming that the website was successfully protected, stabilized, and recovered."*
 - **Visuals on Screen**:
-  - Modal/Card: **Executive Faculty Demonstration Report**.
+  - Card: **Executive Faculty Demonstration Report**.
   - Telemetry comparison: Initial vs. Peak vs. Final state.
   - 5 clear executive answers ready for grading.
 
@@ -195,7 +201,7 @@ Open the browser at `http://127.0.0.1:5174`.
 ### Step 8: Reset to Baseline
 - **What to Click**: Click the **`Reset Demo`** button in the controller banner.
 - **What to Say**:
-  > *"With one click on Reset Demo, the cluster clears demonstration alerts and incidents, restores replica counts back to 2 pods, and returns to a clean baseline state ready for the next evaluation."*
+  > *"With one click on Reset Demo, the cluster clears demonstration alerts and incidents, resets rate-limiting counters, and returns to a clean baseline state ready for the next evaluation."*
 
 ---
 

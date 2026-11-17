@@ -137,6 +137,7 @@ export const api = {
   resumeFacultyDemo: () => request<FacultyDemoStatus>('/demo/resume', { method: 'POST' }),
   stopFacultyDemo: () => request<FacultyDemoStatus>('/demo/stop', { method: 'POST' }),
   resetFacultyDemo: () => request<FacultyDemoStatus>('/demo/reset', { method: 'POST' }),
+  runDemoStep: (stage: number) => request<FacultyDemoStatus>(`/demo/step/${stage}`, { method: 'POST' }),
   getFacultyDemoReport: () => request<FacultyDemoReport>('/demo/report'),
 
   // Security Verdict & Shield
